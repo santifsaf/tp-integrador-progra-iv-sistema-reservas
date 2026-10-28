@@ -1,0 +1,34 @@
+name: seat-reservation
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_PORT: "8081"
+      KC_HEALTH_ENABLED: "true"
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      AVAILABILITY_CLIENT_SECRET: ${AVAILABILITY_CLIENT_SECRET}
+      BOOKING_CLIENT_SECRET: ${BOOKING_CLIENT_SECRET}
+      PAYMENT_CLIENT_SECRET: ${PAYMENT_CLIENT_SECRET}
+      NOTIFICATIONS_CLIENT_SECRET: ${NOTIFICATIONS_CLIENT_SECRET}
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import:ro
+    healthcheck:
+      # La imagen no trae curl: se consulta /health/ready del puerto de management con bash.
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
