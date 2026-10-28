@@ -1,0 +1,191 @@
+{
+  "realm": "seat-reservation",
+  "displayName": "TP Reserva de Asientos",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "accessTokenLifespan": 1800,
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Usuario final que consulta y reserva asientos"
+      },
+      {
+        "name": "offline_access",
+        "description": "${role_offline-access}"
+      },
+      {
+        "name": "uma_authorization",
+        "description": "${role_uma_authorization}"
+      },
+      {
+        "name": "default-roles-seat-reservation",
+        "description": "Roles que recibe todo usuario nuevo, incluidos los que entran con GitHub",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "offline_access",
+            "uma_authorization",
+            "user"
+          ]
+        }
+      }
+    ]
+  },
+  "defaultRole": {
+    "name": "default-roles-seat-reservation"
+  },
+  "identityProviders": [
+    {
+      "alias": "github",
+      "displayName": "GitHub",
+      "providerId": "github",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "${GITHUB_CLIENT_ID}",
+        "clientSecret": "${GITHUB_CLIENT_SECRET}",
+        "syncMode": "IMPORT",
+        "defaultScope": "read:user user:email"
+      }
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "web",
+      "name": "Login del usuario final",
+      "description": "Cliente público para el login con GitHub (PKCE). El password grant queda solo para el usuario de prueba.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:5173/*",
+        "http://localhost:5100/*",
+        "http://localhost:5200/*",
+        "http://localhost:5300/*",
+        "https://oauth.pstmn.io/v1/callback"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-availability",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "availability",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "availability",
+      "name": "Availability Service",
+      "description": "Llama por HTTP a Booking: su token incluye aud=booking",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${AVAILABILITY_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audience-booking",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "booking",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "booking",
+      "name": "Booking Service",
+      "description": "Llama por gRPC a Payment: su token incluye aud=payment",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${BOOKING_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audience-payment",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "payment",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "payment",
+      "name": "Payment Service",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${PAYMENT_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    },
+    {
+      "clientId": "notifications",
+      "name": "Notifications Service",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${NOTIFICATIONS_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "tester",
+      "email": "tester@example.com",
+      "emailVerified": true,
+      "firstName": "Usuario",
+      "lastName": "De Prueba",
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "tester",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-seat-reservation"
+      ]
+    }
+  ]
+}
