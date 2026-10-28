@@ -1,4 +1,7 @@
-# Infraestructura
+# Keycloak
+
+Autenticación del sistema: login de usuarios con GitHub y tokens entre microservicios (client credentials).
+Para la visión general del proyecto, ver el [README principal](../README.md).
 
 ## Configuración proveedor externo (GitHub)
 
