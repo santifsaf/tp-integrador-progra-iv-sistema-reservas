@@ -64,14 +64,18 @@ El microservicio `Availability.Api` actúa como la **puerta de entrada pública*
 **Estimación:** 2 horas
 
 #### Paso 1.1: Crear estructura de carpetas y DTOs
+✅ **COMPLETADO**
+
 - **Carpeta:** `Availability.Api/DTOs/Requests/` y `Availability.Api/DTOs/Responses/`
-- **DTOs a crear:**
+- **DTOs creados:**
   - `CreateReservationRequest.cs` (eventId, seatId)
   - `ReservationResponse.cs` (requestId, status, message)
   - `GetSeatsResponse.cs` (seatId, status, eventId)
   - `GetReservationStatusResponse.cs` (requestId, status, createdAt, updatedAt)
 
-**Tiempo estimado:** 0.5 horas
+**Resumen de cambios:** Creadas 4 clases DTO con propiedades documentadas, estructura de carpetas organizadas por tipo de transferencia (Requests/Responses). Compilación exitosa.
+
+**Tiempo real:** 0.5 horas
 
 ---
 
@@ -637,6 +641,12 @@ Availability.Domain/
 - **Código limpio:** Aplicar principios SOLID, naming claro y comentarios solo donde sea necesario.
 - **Logging consistente:** Siempre incluir `CorrelationId` en logs de auditoría.
 - **Pendiente de escalación:** Si `Availability.Application` o `Availability.Domain` necesitan expansión, se coordina en próximo sprint.
+
+
+## Análisis Adicional: Estrategia de Commits
+
+### Recomendación: Commits por **Sub-fase** (granularidad media)
+Usar formato `feat(availability-api/phase-N): [descripción]` para claridad y trazabilidad.
 
 ---
 
