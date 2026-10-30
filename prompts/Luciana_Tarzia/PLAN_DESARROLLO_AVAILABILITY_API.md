@@ -114,15 +114,52 @@ El microservicio `Availability.Api` actúa como la **puerta de entrada pública*
 ---
 
 #### Paso 1.3: Configurar logging base en Program.cs
-- Registrar `ILogger<T>` en contenedor DI
-- Configurar Serilog (si se aplica) o Console Logger
-- Establecer niveles de log (Development vs Production)
+✅ **COMPLETADO**
 
-**Tiempo estimado:** 0.5 horas
+- **Ubicación:** `src/Availability/Availability.Api/Program.cs`
+- **Funcionalidad Implementada:**
+  - ✅ Registrar `ILogger<T>` mediante Serilog en contenedor DI
+  - ✅ Configurar Serilog como proveedor principal (reemplazando default loggers)
+  - ✅ Establecer niveles de log: **Information** (Development + Production)
+  - ✅ Doble salida: Consola + Archivo con rotación diaria
+  - ✅ Template estructurado con timestamp, nivel, mensaje y excepciones
+  - ✅ Enrichment de logs: contexto global + propiedad personalizada "Service"
+  - ✅ Gestión del ciclo de vida: Try-catch-finally con logs de auditoría
+
+**Cambios Realizados:**
+
+1. **Archivo Actualizado:** `src/Availability/Availability.Api/Program.cs`
+   - Agregado: `using Serilog;`
+   - Agregado: `builder.Services.AddLogging()` con Serilog integrado
+   - Configuración centralizada de Serilog:
+     - MinimumLevel: Information
+     - WriteTo.Console con template personalizado
+     - WriteTo.File con rotación diaria (`logs/availability-api-{date}.txt`)
+     - Enrich.FromLogContext() para capturar contexto
+     - Enrich.WithProperty("Service", "Availability.Api")
+   - Try-catch-finally:
+     - Log.Information("Iniciando aplicación Availability.Api")
+     - Log.Fatal() para excepciones no manejadas
+     - Log.CloseAndFlush() para guarantee de escritura
+
+2. **Archivo Actualizado:** `src/Availability/Availability.Api/Availability.Api.csproj`
+   - Agregado PackageReference: `Serilog` v4.0.0
+   - Agregado PackageReference: `Serilog.AspNetCore` v8.0.0
+   - Agregado PackageReference: `Serilog.Sinks.Console` v6.0.0
+   - Agregado PackageReference: `Serilog.Sinks.File` v5.0.0
+
+**Validación:**
+- ✅ Compilación exitosa
+- ✅ Paquetes NuGet instalados y compatible con .NET 8/10
+- ✅ Logs disponibles en consola y archivo `logs/` automáticamente
+- ✅ Integración con Correlation ID Middleware lista
+- ✅ Pronto para FASE 2 (autenticación JWT)
+
+**Tiempo real:** 0.5 horas
 
 ---
 
-**Subtotal Fase 1: 2 horas**
+**Subtotal Fase 1: 1.5 horas (cronometrado)**
 
 ---
 
@@ -502,11 +539,11 @@ namespace Availability.Api.Middleware
 
 ## Checklist de Completación
 
-### Fase 1 ✅ (Parcialmente Completada)
-- [x] Crear estructura de carpetas (DTOs, Middleware)
-- [x] Implementar `CorrelationIdMiddleware.cs` ✅ **PASO 1.2 COMPLETADO**
-- [x] Crear clases DTO (Request, Response)
-- [ ] Configurar logging base en `Program.cs` (Paso 1.3 - PENDIENTE)
+### Fase 1 ✅ (COMPLETADA)
+- [x] Crear estructura de carpetas (DTOs, Middleware) ✅ **PASO 1.1**
+- [x] Implementar `CorrelationIdMiddleware.cs` ✅ **PASO 1.2**
+- [x] Crear clases DTO (Request, Response) ✅ **PASO 1.1**
+- [x] Configurar logging base en `Program.cs` (Serilog + Paquetes NuGet) ✅ **PASO 1.3 COMPLETADO**
 
 ### Fase 2 ✅
 - [ ] Agregar paquetes NuGet JWT Bearer

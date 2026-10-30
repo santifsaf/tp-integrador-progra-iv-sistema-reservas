@@ -229,3 +229,67 @@ de los cambios. fijate el checklist tambien de la linea 544.
   - Fase 1: Marcadas [x] items 1, 2 y 3 / [ ] item 4 (Paso 1.3 pendiente)
   - Agregadas notas clarificadoras ("PASO 1.2 COMPLETADO", "Paso 1.3 - PENDIENTE")
 
+---
+
+## Prompt 5: Implementación Fase 1.3 - Configurar Logging Base
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Ejecución post-Fase 1.2  
+**Objetivo:** Configurar Serilog como proveedor de logging en Program.cs y registrar dependencias NuGet
+
+### Prompts Ejecutados:
+
+```
+arranquemos con fase 1.3 del plan de desarrollo. leé todo el # adjunto para contexto.
+una vez finalizado el desarrollo validá cambios con compilación
+```
+
+### Resultado Entregado:
+
+**Cambios Implementados:**
+
+1. **Program.cs - Configuración completa de Serilog:**
+   - ✅ Limpieza de proveedores por defecto (`ClearProviders()`)
+   - ✅ Serilog registrado como proveedor principal de logging
+   - ✅ Nivel mínimo: **Information** (Development + Production)
+   - ✅ Doble salida: Consola + Archivo con rotación diaria (`logs/availability-api-{date}.txt`)
+   - ✅ Template estructurado: `[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}`
+   - ✅ Enrich: `FromLogContext()` + Propiedad `{ Service: "Availability.Api" }`
+   - ✅ Gestión del ciclo de vida: Try-catch-finally con logs de auditoría
+     - `Log.Information("Iniciando aplicación Availability.Api")`
+     - `Log.Fatal(ex, "La aplicación terminó inesperadamente")`
+     - `Log.CloseAndFlush()` para garantía de escritura
+
+2. **Availability.Api.csproj - Dependencias NuGet agregadas:**
+   - ✅ `Serilog` v4.0.0
+   - ✅ `Serilog.AspNetCore` v8.0.0
+   - ✅ `Serilog.Sinks.Console` v6.0.0
+   - ✅ `Serilog.Sinks.File` v5.0.0
+
+**Validación:** 
+- ✅ Compilación exitosa sin errores
+- ✅ Paquetes NuGet compatible con .NET 8/10
+- ✅ Logs disponibles en consola y archivo automáticamente
+- ✅ Integración con Correlation ID Middleware lista
+
+**Tiempo real:** 0.5 horas
+
+---
+
+```
+actualiza plan de desarrollo de la fase 1.3 finalizada y hace un pequeño resumen 
+de los cambios. fijate el checklist tambien de la linea 544.
+```
+
+### Resultado Entregado:
+
+- ✅ Paso 1.3 actualizado con estado **COMPLETADO**
+- ✅ Agregada sección "Cambios Realizados" con 2 archivos (Program.cs + .csproj)
+- ✅ Agregada sección "Validación" con compilación exitosa
+- ✅ Tiempo real actualizado: 0.5 horas
+- ✅ Subtotal Fase 1 actualizado a: **1.5 horas (cronometrado)**
+- ✅ Checklist actualizado:
+  - Fase 1: Marcada como **✅ COMPLETADA** (no "Parcialmente")
+  - Paso 1.3 ahora indica **✅ COMPLETADO** con detalle "(Serilog + Paquetes NuGet)"
+  - Próximo hito: FASE 2 - Autenticación JWT
+
