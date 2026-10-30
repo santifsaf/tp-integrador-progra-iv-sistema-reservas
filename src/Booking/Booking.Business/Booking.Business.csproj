@@ -4,7 +4,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <!-- Logging, Options, DI y Hosting (BackgroundService) vienen del framework de
+       ASP.NET Core, que Booking ya usa por ser una REST API. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Booking.Data/Booking.Data.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Booking.Business.Tests" />
   </ItemGroup>
 </Project>

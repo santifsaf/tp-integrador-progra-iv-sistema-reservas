@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.21.0" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Booking.Business/Booking.Business.csproj" />
   </ItemGroup>
 </Project>
