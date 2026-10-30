@@ -142,12 +142,13 @@ public sealed class ReservationRequestProcessor(
             PaymentResult.Succeeded => (ReservationStatus.Confirmed, null),
             PaymentResult.Failed => (ReservationStatus.Rejected, RejectionReason.PaymentFailed),
 
-            // Payment no está: la llamada no llegó, así que no cobró. Se rechaza y el
-            // asiento queda libre. Es el flujo de fallo de 3j.
+            // Payment RESPONDIÓ "pago no disponible" (respuesta de negocio): informa que no
+            // cobró, así que se rechaza y el asiento queda libre.
             PaymentResult.Unavailable => (ReservationStatus.Rejected, RejectionReason.PaymentUnavailable),
 
-            // Resultado incierto: la reserva queda Held y se reintenta el mensaje
-            // (ver PaymentResultUncertainException).
+            // Resultado incierto (timeout, Payment caído, cualquier error de comunicación):
+            // Payment pudo haber cobrado. La reserva queda Held y se reintenta el mensaje
+            // (ver PaymentResultUncertainException). Si nunca hay resultado, vence.
             PaymentResult.Uncertain => throw new PaymentResultUncertainException(reservation.Id),
 
             _ => throw new InvalidOperationException($"Resultado de pago no contemplado: {paymentResult}"),
@@ -155,11 +156,13 @@ public sealed class ReservationRequestProcessor(
 
         var now = clock.GetUtcNow();
 
-        // Transición condicional: solo se aplica si la reserva SIGUE Held. Si mientras
-        // esperábamos a Payment el job de vencimiento la pasó a Expired, el asiento ya pudo
-        // haberse liberado para otra persona y no podemos confirmarla.
-        var applied = await repository.TryChangeStatusAsync(
-            reservation.Id, ReservationStatus.Held, target.Status, target.Reason, now, ct);
+        // Transición condicional y atómica: solo se aplica si la reserva SIGUE Held y
+        // TODAVÍA NO VENCIÓ (ver IReservationRepository.TryResolveHeldAsync). Cubre dos casos:
+        //   - el job ya la pasó a Expired mientras esperábamos a Payment;
+        //   - el plazo ya pasó pero el job todavía no corrió (sigue Held, pero vencida).
+        // En los dos, el asiento pudo haberse liberado para otra persona: no se confirma.
+        var applied = await repository.TryResolveHeldAsync(
+            reservation.Id, target.Status, target.Reason, now, ct);
 
         if (!applied)
         {
@@ -171,19 +174,23 @@ public sealed class ReservationRequestProcessor(
                 reservation.UpdatedAt = current.UpdatedAt;
             }
 
+            var why = reservation.Status == ReservationStatus.Held
+                ? "hold deadline passed, waiting for the expiration job"
+                : $"reservation already {reservation.Status}";
+
             // Solo hace falta devolver la plata si se cobró y la reserva NO quedó confirmada
-            // (por ejemplo, venció mientras se esperaba a Payment). Si ya estaba Confirmed,
-            // es el mismo cobro informado dos veces (Payment es idempotente).
+            // (venció mientras se esperaba a Payment). Si ya estaba Confirmed, es el mismo
+            // cobro informado dos veces (Payment es idempotente).
             if (paymentResult == PaymentResult.Succeeded && reservation.Status != ReservationStatus.Confirmed)
             {
-                // Se cobró una reserva que ya no estaba Held. En un sistema real esto
-                // dispara una devolución; para el TP queda registrado para conciliación.
+                // En un sistema real esto dispara una devolución; para el TP queda
+                // registrado para conciliación.
                 logger.LogWarning(
-                    "Pago exitoso para la reserva {ReservationId}, pero ya estaba {Status}. Requiere devolución.",
-                    reservation.Id, reservation.Status);
+                    "Pago exitoso para la reserva {ReservationId} fuera de plazo ({Why}). Requiere devolución.",
+                    reservation.Id, why);
             }
 
-            Step(logger, reservation.RequestId, $"PaymentResultDiscarded (reservation already {reservation.Status})");
+            Step(logger, reservation.RequestId, $"PaymentResultDiscarded ({why})");
             return;
         }
 

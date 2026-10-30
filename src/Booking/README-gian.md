@@ -15,7 +15,7 @@ estados `Held/Confirmed/Rejected/Expired` guardados como texto, ids `Guid`.
 | `Booking.Data` | Datos | Interfaz `IReservationRepository` con el SQL esperado en comentarios | Interfaz: Gian. Implementación EF: **Luis** |
 | `Booking.Business` | Negocio | `ReservationRequestProcessor`, `ReservationExpirationService`, `ReservationExpirationWorker`, `IPaymentClient`, `IReservationEventPublisher` | Gian |
 | `Booking.Api/Messaging` | Presentación (entrada por broker) | `ReservationRequestedConsumer` con `ServiceBusProcessor` | Gian |
-| `Booking.Business.Tests` | Tests | 18 casos con fakes en memoria | Gian |
+| `Booking.Business.Tests` | Tests | 22 casos con fakes en memoria | Gian |
 | `Booking.Demo` | Herramienta | Simulador local (no se despliega) | Gian |
 
 Dependencias N-Layer: `Api → Business → Data`. Data no conoce a nadie.
@@ -83,8 +83,7 @@ dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>
 |---|---|---|
 | **Rebeca y Felipe** | Contrato del mensaje (`requestId`, `eventId`, `seatId`, `userId`, `requestedAt`, JSON camelCase). Publicar un record propio, **no la entidad `ReservationRequest`** (llegaría `id` en vez de `requestId` y todo iría a dead-letter). Pedirle `MessageId = requestId`. Sumar `amountCents` y `currency` cuando `Event` tenga precio. | `Booking.Business/Messages/ReservationRequestedMessage.cs`, después a `/contracts` |
 | **Luis** | Implementar `IReservationRepository` con los tres índices, los estados como texto y los `UPDATE` condicionales. Sumar `GetOccupiedSeatIdsAsync(eventId)` para el endpoint de asientos ocupados. | `Booking.Data/IReservationRepository.cs` |
-| **Santi** | Implementar `IPaymentClient` (con token de Keycloak, `aud=payment`). Endpoints que pide `IBookingClient` de Availability: `GET /events/{eventId}/occupied-seats` y `GET /reservations/{requestId}` → `{status, description}`, 404 si todavía no se procesó. | `Booking.Business/Payments/IPaymentClient.cs` |
-| **Grupo** | Mapeo de errores de Payment: respuesta explícita `PAYMENT_UNAVAILABLE` → `Rejected (PaymentUnavailable)`. Error gRPC `UNAVAILABLE` (Payment caído): hoy → rechazo; propuesta → `Uncertain` (reintenta y, si no hay resultado, vence). Timeout → `Uncertain`. `PAYMENT_PENDING` no hace falta; si se agrega, → `Uncertain`. | `IPaymentClient.cs` |
+| **Santi** | Implementar `IPaymentClient` (con token de Keycloak, `aud=payment`) con el mapeo de la interfaz: solo `PAYMENT_UNAVAILABLE` explícito → `Unavailable`; cualquier `RpcException` (incluido `StatusCode.Unavailable`) → `Uncertain`. Endpoints que pide `IBookingClient` de Availability: `GET /events/{eventId}/occupied-seats` y `GET /reservations/{requestId}` → `{status, description}`, 404 si todavía no se procesó. | `Booking.Business/Payments/IPaymentClient.cs` |
 | **Agus y Juan** | Payment idempotente por `ReservationId` (`payments.reservation_id` UNIQUE): si se reintenta, devuelve el resultado anterior sin volver a cobrar. | Contrato `.proto` |
 | **Juan y Kevin** | Cómo le llegan a Notifications `ReservationCreated` y `ReservationConfirmed`: suscripción nueva pedida al profe, o HTTP. Por ahora solo se loguean. | `Booking.Business/Events/IReservationEventPublisher.cs` |
 | **Felipe** | Formato de los logs de auditoría (el correlation id ya es `RequestId`). | `Booking.Business/Auditing/AuditLog.cs` |
@@ -99,13 +98,17 @@ dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>
   reintento retoma el cobro, y Payment no cobra dos veces porque es idempotente.
   Si dos réplicas reciben la misma solicitud a la vez, solo cobra la que insertó la
   reserva; la otra no llama a Payment.
-- **Transiciones condicionales:** `UPDATE ... WHERE status = 'Held'`. El resultado del
-  pago y el job de vencimiento no se pisan.
-- **Payment caído vs. timeout:** si Payment no está (`Unavailable`), seguro no cobró:
-  se rechaza con `PaymentUnavailable` y se libera el asiento (flujo de fallo de 3j).
-  Si hay timeout (`Uncertain`), Payment pudo haber cobrado: la reserva queda Held, el
-  mensaje se reintenta y, si nunca llega un resultado, vence (`Expired` = "sin
-  resultado de pago", como dice la consigna).
+- **Transiciones condicionales:** el resultado del pago y el job de vencimiento usan
+  `UPDATE` con condición sobre el estado, así no se pisan.
+- **Respuesta de Payment vs. error de comunicación:** solo una respuesta explícita
+  de Payment rechaza (`PAYMENT_REJECTED` → `PaymentFailed`, `PAYMENT_UNAVAILABLE` →
+  `PaymentUnavailable`). Cualquier error gRPC, incluido `StatusCode.Unavailable` y el
+  timeout, es `Uncertain`: Payment pudo haber cobrado, así que la reserva queda Held,
+  se reintenta y, si nunca hay resultado, vence (`Expired` = "sin resultado de pago").
+  Ese es el flujo de fallo de 3j cuando Payment está caído.
+- **Confirmar dentro del plazo:** el resultado del pago se aplica con
+  `UPDATE ... WHERE status = 'Held' AND expires_at > @now`, atómico en la base. Si el
+  plazo pasó, no se confirma aunque el job de vencimiento todavía no haya corrido.
 - **Pago exitoso después de vencer:** no se confirma (el asiento pudo pasar a otro);
   queda en el log como caso para devolución (pendiente: guardarlo en la tabla como
   `REFUND_REQUIRED`).

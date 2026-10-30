@@ -50,16 +50,21 @@ public interface IReservationRepository
     // Held ni Confirmed. Devuelve false si ya existía una reserva para esa solicitud.
     Task<bool> AddRejectedAsync(Reservation reservation, CancellationToken ct);
 
-    // Cambia el estado SOLO si la reserva sigue en el estado esperado:
+    // Aplica el resultado del pago (Confirmed o Rejected) SOLO si la reserva sigue Held
+    // Y TODAVÍA ESTÁ DENTRO DE SU PLAZO, en una única sentencia atómica:
     //   UPDATE reservations
     //   SET status = @to, rejection_reason = @reason, updated_at = @now
-    //   WHERE id = @id AND status = @from;
+    //   WHERE id = @id AND status = 'Held' AND expires_at > @now;
     // Devuelve true si actualizó una fila.
-    // Así el resultado del pago y el job de vencimiento no se pisan entre sí:
-    // el que llega segundo no actualiza nada y se entera por el false.
-    Task<bool> TryChangeStatusAsync(
+    //
+    // DECISIÓN: el chequeo de estado y de vigencia van juntos en el WHERE. No alcanza con
+    // mirar el estado: si la retención venció a las 12:02:00 y Payment responde a las
+    // 12:02:05, el job de vencimiento puede no haber corrido todavía y la reserva seguiría
+    // Held. Sin la condición de expires_at se confirmaría una reserva vencida.
+    // Tampoco alcanza con chequear el plazo en C# antes del UPDATE: entre la lectura y la
+    // escritura puede pasar el tiempo. Por eso el chequeo es atómico en la base.
+    Task<bool> TryResolveHeldAsync(
         Guid reservationId,
-        ReservationStatus from,
         ReservationStatus to,
         RejectionReason? reason,
         DateTimeOffset now,

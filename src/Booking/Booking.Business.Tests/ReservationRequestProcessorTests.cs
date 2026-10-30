@@ -269,6 +269,52 @@ public class ReservationRequestProcessorTests
         Assert.Equal(ReservationStatus.Confirmed, reservation.Status);
     }
 
+    [Theory]
+    [InlineData(PaymentResult.Succeeded)]
+    [InlineData(PaymentResult.Failed)]
+    [InlineData(PaymentResult.Unavailable)]
+    public async Task PaymentResultAfterTheDeadlineButBeforeTheJobRuns_IsNotApplied(PaymentResult result)
+    {
+        // Caso de la review: la retención vence a las 12:02:00 y Payment responde a las
+        // 12:02:05. El job (que corre cada 30 s) todavía no la marcó Expired, así que la
+        // reserva sigue Held. Igual no se tiene que aplicar el resultado del pago.
+        var payment = new FakePaymentClient(result)
+        {
+            During = _ =>
+            {
+                _clock.Advance(HoldDuration + TimeSpan.FromSeconds(5));
+                return Task.CompletedTask;
+            },
+        };
+
+        var reservation = await CreateProcessor(payment).ProcessAsync(NewRequest(), CancellationToken.None);
+
+        Assert.Equal(ReservationStatus.Held, reservation.Status);
+        Assert.DoesNotContain(_publisher.Published, e => e.Type == ReservationEventType.ReservationConfirmed);
+
+        // Cuando el job corre, la vence y el asiento queda libre.
+        await CreateExpirationService().ExpireHeldAsync(CancellationToken.None);
+        Assert.Equal(ReservationStatus.Expired, Assert.Single(_repository.All).Status);
+    }
+
+    [Fact]
+    public async Task PaymentResultJustBeforeTheDeadline_IsApplied()
+    {
+        // Límite: Payment responde 1 segundo antes del vencimiento. Se confirma.
+        var payment = new FakePaymentClient(PaymentResult.Succeeded)
+        {
+            During = _ =>
+            {
+                _clock.Advance(HoldDuration - TimeSpan.FromSeconds(1));
+                return Task.CompletedTask;
+            },
+        };
+
+        var reservation = await CreateProcessor(payment).ProcessAsync(NewRequest(), CancellationToken.None);
+
+        Assert.Equal(ReservationStatus.Confirmed, reservation.Status);
+    }
+
     [Fact]
     public async Task PaymentSucceededAfterExpiration_IsNotConfirmed()
     {

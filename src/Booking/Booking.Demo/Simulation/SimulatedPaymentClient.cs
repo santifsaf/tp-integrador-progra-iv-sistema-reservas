@@ -12,7 +12,7 @@ public enum PaymentScenario
     Failed,                 // responde "pago rechazado"
     Unavailable,            // responde "pago no disponible"
     TimeoutThenSucceeded,   // cobra, pero la respuesta se pierde (timeout); al reintentar devuelve el éxito guardado
-    NeverResponds,          // nunca responde: siempre timeout, nunca cobra
+    NeverResponds,          // caído o sin respuesta: siempre error de comunicación, nunca cobra
 }
 
 // Reemplaza al cliente gRPC de Santi + al servicio Payment.

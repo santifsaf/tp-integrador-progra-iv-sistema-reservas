@@ -71,12 +71,15 @@ internal sealed class InMemoryReservationRepository : IReservationRepository
         }
     }
 
-    public Task<bool> TryChangeStatusAsync(Guid reservationId, ReservationStatus from, ReservationStatus to,
+    // Imita: UPDATE ... WHERE id = @id AND status = 'Held' AND expires_at > @now
+    public Task<bool> TryResolveHeldAsync(Guid reservationId, ReservationStatus to,
         RejectionReason? reason, DateTimeOffset now, CancellationToken ct)
     {
         lock (_lock)
         {
-            var r = _reservations.FirstOrDefault(x => x.Id == reservationId && x.Status == from);
+            var r = _reservations.FirstOrDefault(x => x.Id == reservationId
+                                                      && x.Status == ReservationStatus.Held
+                                                      && x.ExpiresAt > now);
             if (r is null) return Task.FromResult(false);
 
             r.Status = to;

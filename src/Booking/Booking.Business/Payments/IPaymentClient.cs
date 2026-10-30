@@ -14,11 +14,18 @@ namespace Booking.Business.Payments;
 //     cobro de la misma reserva (reintentos) y Payment no debe cobrar dos veces.
 //     Acordarlo con Agus y Juan en el .proto (payments.reservation_id UNIQUE).
 //   - Cómo mapear la respuesta (ver PaymentResult):
-//       respuesta de éxito                      -> Succeeded
-//       respuesta de pago rechazado             -> Failed
-//       RpcException StatusCode.Unavailable     -> Unavailable
-//       RpcException StatusCode.DeadlineExceeded-> Uncertain
-//       cualquier otra RpcException             -> Uncertain
+//       respuesta PAYMENT_SUCCEEDED                   -> Succeeded
+//       respuesta PAYMENT_REJECTED                    -> Failed
+//       respuesta PAYMENT_UNAVAILABLE                 -> Unavailable
+//       PAYMENT_STATUS_UNSPECIFIED (o PENDING)        -> Uncertain
+//       CUALQUIER RpcException, incluida
+//       StatusCode.Unavailable y DeadlineExceeded     -> Uncertain
+//
+// DECISIÓN: solo una RESPUESTA EXPLÍCITA de Payment puede rechazar la reserva. Un error
+// técnico de comunicación, aunque sea StatusCode.Unavailable, no garantiza que Payment no
+// haya procesado el cobro (la conexión puede cortarse después de que el pedido llegó).
+// Por eso se trata como resultado incierto: la reserva queda Held, se reintenta y, si
+// nunca llega un resultado, vence (Expired = "sin resultado de pago", como dice la consigna).
 public interface IPaymentClient
 {
     Task<PaymentResult> ChargeAsync(Reservation reservation, CancellationToken ct);
@@ -32,12 +39,14 @@ public enum PaymentResult
     // Payment respondió que el pago fue rechazado.
     Failed,
 
-    // No se pudo conectar con Payment. La llamada no llegó, así que SEGURO no cobró:
-    // se puede rechazar la reserva y liberar el asiento. Es el flujo de fallo de 3j
-    // cuando falta el componente Payment.
+    // Payment RESPONDIÓ explícitamente que el pago no está disponible (PAYMENT_UNAVAILABLE).
+    // Es una respuesta de negocio: Payment informa que no cobró, así que se puede rechazar
+    // la reserva y liberar el asiento. No confundir con el error gRPC StatusCode.Unavailable.
     Unavailable,
 
-    // La llamada salió pero no hubo respuesta (timeout u otro error a mitad de camino).
-    // Payment PUDO haber cobrado, así que no es lo mismo que un pago fallido.
+    // No hay un resultado confiable: timeout, Payment caído (StatusCode.Unavailable) o
+    // cualquier error de comunicación. Payment PUDO haber cobrado, así que no se rechaza.
+    // Si Payment está caído durante todo el plazo de retención, la reserva termina Expired
+    // y el asiento se libera: ese es el flujo de fallo de 3j cuando falta Payment.
     Uncertain,
 }

@@ -37,7 +37,7 @@ public sealed class DemoScenarios(
             Console.WriteLine(" 6) Carrera: 10 personas piden el mismo asiento al mismo tiempo");
             Console.WriteLine(" 7) Mensaje duplicado: el broker entrega dos veces la misma solicitud");
             Console.WriteLine(" 8) Timeout: Payment cobra pero la respuesta se pierde");
-            Console.WriteLine(" 9) Payment nunca responde: la reserva vence y libera el asiento");
+            Console.WriteLine(" 9) Payment caído o sin respuesta: la reserva vence y libera el asiento (flujo de fallo 3j)");
             Console.WriteLine(" e) Ver estado de todas las reservas");
             Console.WriteLine(" t) Correr todos los escenarios");
             Console.WriteLine(" 0) Salir");
@@ -89,7 +89,7 @@ public sealed class DemoScenarios(
             return;
         }
 
-        Console.WriteLine("Respuesta de Payment: 1) éxito  2) rechazado  3) no disponible  4) timeout y después éxito  5) nunca responde");
+        Console.WriteLine("Respuesta de Payment: 1) éxito  2) rechazado  3) no disponible  4) timeout y después éxito  5) caído / nunca responde");
         Console.Write("> ");
         var scenario = (Console.ReadLine()?.Trim()) switch
         {
@@ -192,7 +192,8 @@ public sealed class DemoScenarios(
 
     private async Task NeverRespondsAsync()
     {
-        Title("PAYMENT NUNCA RESPONDE",
+        Title("PAYMENT CAÍDO O SIN RESPUESTA (flujo de fallo 3j)",
+            "Un error de comunicación no garantiza que Payment no haya cobrado: no se rechaza.",
             $"Cada reintento da timeout. A los {HoldDuration.TotalSeconds:0}s la retención vence.",
             "Esperado: Expired (sin resultado de pago), sin cobro, y A8 queda libre para otra persona.",
             "Esto tarda unos segundos...");
