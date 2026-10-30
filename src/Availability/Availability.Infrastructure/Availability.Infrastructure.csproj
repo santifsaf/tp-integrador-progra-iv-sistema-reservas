@@ -6,5 +6,11 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Availability.Application/Availability.Application.csproj" />
+    <ProjectReference Include="../Availability.Domain/Availability.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.21.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 </Project>
