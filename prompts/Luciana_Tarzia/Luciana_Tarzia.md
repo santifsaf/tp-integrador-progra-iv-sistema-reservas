@@ -189,3 +189,43 @@ de los cambios
 - ✅ Agregado resumen conciso: "Creadas 4 clases DTO con propiedades documentadas, estructura de carpetas organizadas por tipo de transferencia (Requests/Responses). Compilación exitosa."
 - ✅ Cambio de métrica: "Tiempo estimado" → "Tiempo real: 0.5 horas"
 
+---
+
+## Prompt 2: Implementación Fase 1.2 - Correlation ID Middleware
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Ejecución post-Fase 1.1  
+**Objetivo:** Implementar el Correlation ID Middleware y compilar sin errores
+
+### Prompts Ejecutados:
+
+```
+arranquemos con fase 1.2 del plan de desarrollo. leé todo el # adjunto para contexto. 
+una vez finalizado el desarrollo validá cambios con compilación
+```
+
+### Resultado Entregado:
+
+- ✅ Archivo creado: `Middleware/CorrelationIdMiddleware.cs` (completo y funcional)
+- ✅ Program.cs actualizado con `using` e `app.UseMiddleware<CorrelationIdMiddleware>();`
+- ✅ Compilación exitosa (sin advertencias en segunda compilación tras corrección de nullable reference)
+- ✅ Middleware registrado ANTES de `MapControllers()` (orden correcto)
+- ✅ Logs de auditoría implementados (recepción y respuesta)
+
+---
+
+```
+actualiza plan de desarrollo de la fase 1.2 finalizada y hace un pequeño resumen 
+de los cambios. fijate el checklist tambien de la linea 544.
+```
+
+### Resultado Entregado:
+
+- ✅ Paso 1.2 actualizado con estado **COMPLETADO**
+- ✅ Agregada sección "Cambios Realizados" con 2 sub-items (archivo creado + archivo actualizado)
+- ✅ Agregada sección "Validación" mostrando compilación exitosa
+- ✅ Tiempo real actualizado: 0.5 horas
+- ✅ Checklist actualizado:
+  - Fase 1: Marcadas [x] items 1, 2 y 3 / [ ] item 4 (Paso 1.3 pendiente)
+  - Agregadas notas clarificadoras ("PASO 1.2 COMPLETADO", "Paso 1.3 - PENDIENTE")
+
