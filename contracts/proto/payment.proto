@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package payment;
+
+option csharp_namespace = "SeatReservation.Contracts.Payment";
+
+// Contrato compartido entre Booking (cliente) y Payment (servidor).
+service PaymentService {
+  // Solicita un cobro. Los reintentos deben conservar payment_operation_id.
+  rpc Charge (ChargeRequest) returns (ChargeResponse);
+
+  // Recupera el estado de una operacion ya registrada sin iniciar otro cobro.
+  rpc GetPayment (GetPaymentRequest) returns (ChargeResponse);
+}
+
+message ChargeRequest {
+  string reservation_id = 1;
+  string payment_operation_id = 2;
+  int64 amount_cents = 3;
+  string currency = 4;
+}
+
+message GetPaymentRequest {
+  string payment_operation_id = 1;
+}
+
+message ChargeResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+  // Vacio cuando no existe un motivo de rechazo o indisponibilidad.
+  string failure_reason = 3;
+}
+
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  PAYMENT_PENDING = 1;
+  PAYMENT_SUCCEEDED = 2;
+  PAYMENT_REJECTED = 3;
+  PAYMENT_UNAVAILABLE = 4;
+}

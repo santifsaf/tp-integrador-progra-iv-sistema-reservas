@@ -1,4 +1,5 @@
 using Booking.Api.Errors;
+using Booking.Api.Payments;
 using Booking.Api.Security;
 using Booking.Business.Queries;
 using Booking.Data;
@@ -9,6 +10,7 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
     context.ProblemDetails.Extensions.TryAdd("traceId", context.HttpContext.TraceIdentifier));
 builder.Services.AddExceptionHandler<BookingExceptionHandler>();
 builder.Services.AddBookingAuthentication(builder.Configuration, builder.Environment);
+builder.Services.AddPaymentCommunication(builder.Configuration);
 
 // Composition root: aquí se registrará IReservationRepository con su implementación
 // EF. La factory permite arrancar /health mientras falta esa integración y devuelve
