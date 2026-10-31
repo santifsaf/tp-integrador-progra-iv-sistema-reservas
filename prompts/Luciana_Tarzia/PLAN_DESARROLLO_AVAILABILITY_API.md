@@ -341,24 +341,26 @@ dotnet build "src/Availability/Availability.Api/Availability.Api.csproj" --confi
 
 ---
 
-#### Paso 2.2: Crear configuración de JWT en appsettings.json
-- Añadir sección `JwtSettings` o `Authentication`
-- Incluir: Authority (Keycloak URL), Audience, RequireHttpsMetadata
+#### Paso 2.2: Crear configuración de JWT en appsettings.json ✅ COMPLETADO
 
-**Ejemplo:**
-```json
-{
-  "JwtSettings": {
-	"Authority": "https://keycloak-server/auth/realms/your-realm",
-	"Audience": "availability-api",
-	"RequireHttpsMetadata": true,
-	"ValidateIssuerSigningKey": true,
-	"ValidateLifetime": true
-  }
-}
-```
+**Descripción:**
+Se agregó la sección `JwtSettings` en `appsettings.json` con configuración para validar tokens JWT desde Keycloak. La configuración incluye:
+- **Authority:** `http://keycloak:8081/realms/seat-reservation` (Docker) - se sobrescribe a `http://localhost:8081/realms/seat-reservation` en `appsettings.Development.json`
+- **Audience:** `availability-api` (validar que el JWT es para este servicio)
+- **RequireHttpsMetadata:** `false` (desarrollo)
+- **ValidateIssuerSigningKey:** `true` (verifica firma del JWT)
+- **ValidateLifetime:** `true` (rechaza JWTs expirados)
 
-**Tiempo estimado:** 0.25 horas
+**Archivos Modificados:**
+- `src/Availability/Availability.Api/appsettings.json` → Configuración base (todos los parámetros)
+- `src/Availability/Availability.Api/appsettings.Development.json` → Override solo de Authority (merge automático)
+
+**Validación:**
+- ✅ Compilación exitosa
+- ✅ Configuración correcta según infraestructura de Keycloak (repo de Feli)
+- ✅ JSON válido y accesible desde `Program.cs` mediante `GetSection("JwtSettings")`
+
+**Tiempo real:** 0.5 horas
 
 ---
 
@@ -706,7 +708,7 @@ namespace Availability.Api.Middleware
 
 ### Fase 2 ⏳ (EN PROGRESO)
 - [x] Agregar paquetes NuGet JWT Bearer ✅ **PASO 2.1 COMPLETADO**
-- [ ] Configurar `appsettings.json` con JWT Settings
+- [x] Configurar `appsettings.json` con JWT Settings ✅ **PASO 2.2 COMPLETADO**
 - [ ] Implementar `AddJwtBearer()` en `Program.cs`
 - [ ] Registrar middleware `UseAuthentication()` y `UseAuthorization()`
 - [ ] Implementar extracción de UserId desde claims JWT en controlador

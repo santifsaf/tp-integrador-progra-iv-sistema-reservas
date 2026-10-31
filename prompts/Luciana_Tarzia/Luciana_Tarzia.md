@@ -334,6 +334,40 @@ lee todo el plan de desarrollo que te adjunto y actualiza la fase 2.1 con una pe
 
 **Próximo paso:** Fase 2.2 - Configuración JWT en appsettings.json
 
-
 **Estado Fase 2.1:** ✅ COMPLETADA
+
+
+## Prompt 7: Ejecución Fase 2.2 - Configurar `appsettings.json` con JWT Settings
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.1 - Agregar paquetes NuGet necesarios para autenticación JWT
+
+### Contenido del Prompt Original:
+
+```
+lee todo el archivo que te adjunto que es el plan de desarrollo y empezamos con la fase 2.2. una vez hechos los cambios valida compilando el proyecto.
+```
+```
+agrega en el plan de desarollo la finalizacion de fase 2.2. primero lee el archivo y despues agrega pequeña descripcion de lo cambiado. tene en cuenta que en la linea 707 hay un checklist
+```
+
+### Resultado Entregado:
+Se agregó la sección `JwtSettings` en `appsettings.json` con configuración para validar tokens JWT desde Keycloak. La configuración incluye:
+- **Authority:** `http://keycloak:8081/realms/seat-reservation` (Docker) - se sobrescribe a `http://localhost:8081/realms/seat-reservation` en `appsettings.Development.json`
+- **Audience:** `availability-api` (validar que el JWT es para este servicio)
+- **RequireHttpsMetadata:** `false` (desarrollo)
+- **ValidateIssuerSigningKey:** `true` (verifica firma del JWT)
+- **ValidateLifetime:** `true` (rechaza JWTs expirados)
+
+**Archivos Modificados:**
+- `src/Availability/Availability.Api/appsettings.json` → Configuración base (todos los parámetros)
+- `src/Availability/Availability.Api/appsettings.Development.json` → Override solo de Authority (merge automático)
+
+**Validación:**
+- ✅ Compilación exitosa
+- ✅ Configuración correcta según infraestructura de Keycloak (repo de Feli)
+- ✅ JSON válido y accesible desde `Program.cs` mediante `GetSection("JwtSettings")`
+
+**Tiempo real:** 0.5 horas
 
