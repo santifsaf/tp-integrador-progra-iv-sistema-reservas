@@ -1,0 +1,58 @@
+using Availability.Application.Abstractions;
+using Availability.Infrastructure.Http;
+using Availability.Infrastructure.Options;
+using Availability.Infrastructure.Persistence;
+using Availability.Infrastructure.Repositories;
+using Azure.Messaging.ServiceBus;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+namespace Availability.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddOptions<ServiceBusOptions>()
+            .Bind(configuration.GetSection("ServiceBus"));
+        services.AddOptions<BookingClientOptions>()
+            .Bind(configuration.GetSection("Booking"));
+        services.AddOptions<KeycloakOptions>()
+            .Bind(configuration.GetSection("Keycloak"));
+
+        services.AddDbContext<AvailabilityDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("AvailabilityDb")));
+
+        services.AddScoped<IReservationRequestRepository, ReservationRequestRepository>();
+        services.AddScoped<IEventRepository, EventRepository>();
+        services.AddScoped<ISeatRepository, SeatRepository>();
+        services.AddSingleton(TimeProvider.System);
+
+        services.AddSingleton(serviceProvider =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<IOptions<ServiceBusOptions>>()
+                .Value;
+            return new ServiceBusClient(options.ConnectionString);
+        });
+        services.AddSingleton(serviceProvider =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<IOptions<ServiceBusOptions>>()
+                .Value;
+            return serviceProvider
+                .GetRequiredService<ServiceBusClient>()
+                .CreateSender(options.TopicName);
+        });
+
+        services.AddHttpClient(HttpClientNames.Keycloak);
+        services.AddSingleton<KeycloakTokenProvider>();
+        services.AddTransient<BookingAuthHandler>();
+
+        return services;
+    }
+}
