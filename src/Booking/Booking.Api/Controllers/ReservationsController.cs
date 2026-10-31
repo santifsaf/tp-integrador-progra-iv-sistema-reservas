@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Booking.Api.Controllers;
 
+// N-Layer: el controlador adapta HTTP y delega la consulta en Business;
+// el acceso a datos queda detrás del repositorio utilizado por ese servicio.
 [ApiController]
 [Route("api/reservations")]
 [Authorize(Policy = BookingAuthentication.AvailabilityPolicy)]

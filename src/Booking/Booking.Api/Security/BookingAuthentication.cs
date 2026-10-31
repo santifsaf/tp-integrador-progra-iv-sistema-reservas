@@ -23,9 +23,11 @@ public static class BookingAuthentication
                 options.Authority = authority;
                 options.Audience = audience;
                 options.MapInboundClaims = false;
-                // La configuración local de Keycloak usa HTTP. Fuera de Development se
-                // exige HTTPS para obtener la metadata y las claves de validación.
-                options.RequireHttpsMetadata = !environment.IsDevelopment();
+                // HTTPS es el valor por defecto fuera de Development. El Docker local
+                // puede permitir HTTP explícitamente sin cambiar el entorno completo
+                // ni desactivar la validación del issuer, audiencia o firma del token.
+                options.RequireHttpsMetadata = section.GetValue<bool?>("RequireHttpsMetadata")
+                    ?? !environment.IsDevelopment();
                 if (!string.IsNullOrWhiteSpace(section["MetadataAddress"]))
                     options.MetadataAddress = section["MetadataAddress"]!;
 

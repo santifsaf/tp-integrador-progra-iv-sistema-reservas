@@ -5,6 +5,9 @@ using static Booking.Business.Auditing.AuditLog;
 
 namespace Booking.Business.Queries;
 
+// Repository: Business depende del contrato IReservationRepository y delega
+// la persistencia en su implementación. La inyección por constructor permite
+// integrar el repositorio real o un doble de pruebas sin cambiar la consulta.
 public sealed class ReservationStatusQueryService(
     IReservationRepository repository,
     ILogger<ReservationStatusQueryService> logger)
@@ -34,9 +37,14 @@ public sealed class ReservationStatusQueryService(
                 _ => throw new InvalidOperationException("Estado de reserva no reconocido."),
             };
 
-            var description = reservation.Status == ReservationStatus.Rejected
-                ? DescribeRejection(reservation.RejectionReason)
-                : null;
+            // HELD describe la espera del resultado; no agrega un estado de pago
+            // ni implica que Payment haya informado PAYMENT_PENDING.
+            var description = reservation.Status switch
+            {
+                ReservationStatus.Held => "Pago en proceso",
+                ReservationStatus.Rejected => DescribeRejection(reservation.RejectionReason),
+                _ => null,
+            };
 
             // La consulta informa el estado guardado: no cobra, confirma ni vence.
             // Esas transiciones pertenecen al procesamiento y al job de Booking.
@@ -48,9 +56,10 @@ public sealed class ReservationStatusQueryService(
             End(logger, requestId, "GetReservationStatus -> Canceled");
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            logger.LogError(ex, "Error consultando la reserva de la solicitud {RequestId}", requestId);
+            // El detalle de la excepción se registra una sola vez en el manejador
+            // de la API. Business completa la auditoría y propaga el fallo.
             End(logger, requestId, "GetReservationStatus -> Error");
             // Solo la ausencia de reserva devuelve null. Un fallo de persistencia
             // debe seguir siendo un error para que Availability no muestre PENDING.

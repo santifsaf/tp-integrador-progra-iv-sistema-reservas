@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -8,7 +7,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Booking.Api.Tests;
@@ -30,7 +28,8 @@ public sealed class ReservationStatusEndpointTests(BookingApiFactory factory) : 
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(expected, json.RootElement.GetProperty("status").GetString());
         var description = json.RootElement.GetProperty("description");
-        if (status == ReservationStatus.Rejected) Assert.Equal("El asiento está ocupado.", description.GetString());
+        if (status == ReservationStatus.Held) Assert.Equal("Pago en proceso", description.GetString());
+        else if (status == ReservationStatus.Rejected) Assert.Equal("El asiento está ocupado.", description.GetString());
         else Assert.Equal(JsonValueKind.Null, description.ValueKind);
         Assert.Equal(2, json.RootElement.EnumerateObject().Count());
     }
@@ -115,7 +114,7 @@ public sealed class ReservationStatusEndpointTests(BookingApiFactory factory) : 
     [Theory]
     [InlineData(false, HttpStatusCode.InternalServerError)]
     [InlineData(true, HttpStatusCode.ServiceUnavailable)]
-    public async Task ExceptionHandler_PreservesRequestIdInErrorLog(
+    public async Task RepositoryFailure_LogsOneExceptionWithRequestId(
         bool repositoryMissing, HttpStatusCode expected)
     {
         var logs = new ExceptionLogCollector();
@@ -132,8 +131,8 @@ public sealed class ReservationStatusEndpointTests(BookingApiFactory factory) : 
         var response = await client.GetAsync(Path(requestId));
 
         await AssertProblem(response, expected);
-        // Se inspecciona el campo estructurado del manejador, no el log de Business,
-        // para detectar la pérdida del identificador al limpiar la ruta del request.
+        // Se incluyen todas las categorías de Booking para detectar duplicados entre
+        // Business y el manejador, además de verificar la correlación del error.
         var entry = Assert.Single(logs.Entries);
         Assert.Equal(requestId.ToString(), entry["RequestId"]?.ToString());
     }
@@ -166,29 +165,4 @@ public sealed class ReservationStatusEndpointTests(BookingApiFactory factory) : 
         return body;
     }
 
-    private sealed class ExceptionLogCollector : ILoggerProvider
-    {
-        public ConcurrentQueue<IReadOnlyDictionary<string, object?>> Entries { get; } = new();
-
-        public ILogger CreateLogger(string categoryName) =>
-            categoryName == "Booking.Api.Errors.BookingExceptionHandler"
-                ? new ErrorLogger(Entries)
-                : NullLogger.Instance;
-
-        public void Dispose() { }
-
-        private sealed class ErrorLogger(
-            ConcurrentQueue<IReadOnlyDictionary<string, object?>> entries) : ILogger
-        {
-            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-            public bool IsEnabled(LogLevel logLevel) => logLevel == LogLevel.Error;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
-                Exception? exception, Func<TState, Exception?, string> formatter)
-            {
-                if (IsEnabled(logLevel) && state is IEnumerable<KeyValuePair<string, object?>> properties)
-                    entries.Enqueue(properties.ToDictionary(property => property.Key, property => property.Value));
-            }
-        }
-    }
 }

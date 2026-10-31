@@ -23,7 +23,8 @@ public sealed class ReservationStatusQueryServiceTests
 
         Assert.NotNull(result);
         Assert.Equal(expected, result.Status);
-        if (status != ReservationStatus.Rejected) Assert.Null(result.Description);
+        if (status == ReservationStatus.Held) Assert.Equal("Pago en proceso", result.Description);
+        else if (status != ReservationStatus.Rejected) Assert.Null(result.Description);
     }
 
     [Theory]
