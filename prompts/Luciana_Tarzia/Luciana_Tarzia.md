@@ -191,7 +191,7 @@ de los cambios
 
 ---
 
-## Prompt 2: Implementación Fase 1.2 - Correlation ID Middleware
+## Prompt 4: Implementación Fase 1.2 - Correlation ID Middleware
 
 **Solicitado por:** Luciana Tarzia  
 **Fecha:** Ejecución post-Fase 1.1  
@@ -292,4 +292,48 @@ de los cambios. fijate el checklist tambien de la linea 544.
   - Fase 1: Marcada como **✅ COMPLETADA** (no "Parcialmente")
   - Paso 1.3 ahora indica **✅ COMPLETADO** con detalle "(Serilog + Paquetes NuGet)"
   - Próximo hito: FASE 2 - Autenticación JWT
+
+---
+
+## Prompt 6: Ejecución Fase 2.1 - Agregar Paquetes NuGet JWT
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.1 - Agregar paquetes NuGet necesarios para autenticación JWT
+
+### Contenido del Prompt Original:
+
+```
+arrancamos con la fase 2 del desarrollo. lee todo el archivo que te adjunto que es el plan de desarrollo 
+y empezamos con la fase 2.1. una vez hechos los cambios valida compilando el proyecto.
+```
+```
+lee todo el plan de desarrollo que te adjunto y actualiza la fase 2.1 con una pequeña descripcion. tambien en el checklist del final, linea 695
+```
+
+### Resultado Entregado:
+
+**Archivos Modificados:**
+1. `src/Availability/Availability.Api/Availability.Api.csproj`
+
+**Cambios Realizados:**
+- ✅ Agregado `Microsoft.AspNetCore.Authentication.JwtBearer` v8.0.0
+- ✅ Agregado `System.IdentityModel.Tokens.Jwt` v7.1.2 (compatible con v7.1.x)
+
+**Características:**
+- Paquete JwtBearer: Valida JWT en cada request automáticamente
+- Paquete IdentityModel.Tokens: Lee y extrae información desde JWT (claims, roles, etc.)
+
+**Validación:**
+- ✅ Compilación exitosa sin errores de sintaxis
+- ✅ Todas las dependencias resueltas correctamente
+- ✅ Proyecto compila en 48.7 segundos
+- ⚠️ 2 advertencias menores sobre resolución de versiones (no afecta funcionalidad)
+
+**Tiempo real:** 0.25 horas
+
+**Próximo paso:** Fase 2.2 - Configuración JWT en appsettings.json
+
+
+**Estado Fase 2.1:** ✅ COMPLETADA
 
