@@ -16,6 +16,9 @@ builder.Services.AddBookingAuthentication(builder.Configuration, builder.Environ
 builder.Services.AddScoped(sp => new ReservationStatusQueryService(
     sp.GetService<IReservationRepository>() ?? throw new ReservationRepositoryNotConfiguredException(),
     sp.GetRequiredService<ILogger<ReservationStatusQueryService>>()));
+builder.Services.AddScoped(sp => new OccupiedSeatsQueryService(
+    sp.GetService<IReservationRepository>() ?? throw new ReservationRepositoryNotConfiguredException(),
+    sp.GetRequiredService<ILogger<OccupiedSeatsQueryService>>()));
 
 var app = builder.Build();
 app.UseExceptionHandler();

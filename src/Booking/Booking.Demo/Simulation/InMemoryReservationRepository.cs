@@ -28,6 +28,18 @@ public sealed class InMemoryReservationRepository : IReservationRepository
         }
     }
 
+    public Task<IReadOnlyList<Guid>> GetOccupiedSeatIdsAsync(Guid eventId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        lock (_lock)
+        {
+            return Task.FromResult<IReadOnlyList<Guid>>(_rows
+                .Where(r => r.EventId == eventId
+                            && r.Status is ReservationStatus.Held or ReservationStatus.Confirmed)
+                .Select(r => r.SeatId).Distinct().ToArray());
+        }
+    }
+
     public async Task<HoldResult> TryHoldAsync(Reservation reservation, CancellationToken ct)
     {
         await Task.Delay(Random.Shared.Next(5, 30), ct); // latencia de red/base

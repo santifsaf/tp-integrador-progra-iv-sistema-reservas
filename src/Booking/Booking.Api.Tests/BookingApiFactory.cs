@@ -66,6 +66,13 @@ public sealed class BookingApiFactory : WebApplicationFactory<Program>
 // de uso de consulta y deben fallar si este endpoint intenta realizarlas.
 internal sealed class QueryTestRepository : IReservationRepository
 {
+    internal static readonly Guid OccupiedEventId = new("00000000-0000-0000-0000-000000000100");
+    internal static readonly Guid FailureEventId = new("00000000-0000-0000-0000-000000000199");
+    internal static readonly Guid[] OccupiedSeatIds =
+    [
+        new("00000000-0000-0000-0000-000000000101"),
+        new("00000000-0000-0000-0000-000000000102"),
+    ];
     internal static readonly Guid FailureRequestId = new("00000000-0000-0000-0000-000000000099");
     internal static Guid RequestIdFor(ReservationStatus status) =>
         new($"00000000-0000-0000-0000-{(int)status + 1:000000000000}");
@@ -85,6 +92,13 @@ internal sealed class QueryTestRepository : IReservationRepository
             });
         }
         return Task.FromResult<Reservation?>(null);
+    }
+
+    public Task<IReadOnlyList<Guid>> GetOccupiedSeatIdsAsync(Guid eventId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (eventId == FailureEventId) throw new InvalidOperationException("internal-database-error");
+        return Task.FromResult<IReadOnlyList<Guid>>(eventId == OccupiedEventId ? OccupiedSeatIds : []);
     }
 
     public Task<HoldResult> TryHoldAsync(Reservation reservation, CancellationToken ct) => throw new NotSupportedException();

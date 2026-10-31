@@ -14,11 +14,15 @@ internal sealed class BookingExceptionHandler(ILogger<BookingExceptionHandler> l
         // valores originales en esta feature para mantener la correlación del log.
         var feature = httpContext.Features.Get<IExceptionHandlerFeature>();
         object? requestId = null;
+        object? eventId = null;
         if (feature?.RouteValues is { } routeValues)
+        {
             routeValues.TryGetValue("requestId", out requestId);
+            routeValues.TryGetValue("eventId", out eventId);
+        }
 
-        logger.LogError(exception, "Fallo de Booking. RequestId={RequestId} TraceId={TraceId}",
-            requestId, httpContext.TraceIdentifier);
+        logger.LogError(exception, "Fallo de Booking. RequestId={RequestId} EventId={EventId} TraceId={TraceId}",
+            requestId, eventId, httpContext.TraceIdentifier);
 
         var unavailable = exception is ReservationRepositoryNotConfiguredException;
         // El detalle técnico queda en logs. El cliente recibe ProblemDetails sin
