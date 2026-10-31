@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <!-- AuditLog usa ILogger, pero la capa de negocio no depende de ASP.NET Core. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
     <ProjectReference Include="../Payment.Data/Payment.Data.csproj" />
   </ItemGroup>
 </Project>
