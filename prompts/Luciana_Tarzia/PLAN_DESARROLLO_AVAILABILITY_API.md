@@ -395,11 +395,24 @@ Configuración JWT en Program.cs (Step 2-6)
 
 ---
 
-#### Paso 2.4: Crear política de autorización (opcional, por si se requiere)
-- Definir atributo `[Authorize]` en controladores protegidos
-- Validar presencia de claims específicos si es necesario
+#### Paso 2.4: Crear política de autorización (opcional, por si se requiere) ✅ COMPLETADO
 
-**Tiempo estimado:** 0.25 horas
+**Descripción:**
+Se ha implementado la política de autorización completa para el microservicio Availability.Api:
+
+**Extensión ClaimsPrincipalExtensions** (`src/Availability/Availability.Api/Extensions/ClaimsPrincipalExtensions.cs`):
+   - ✅ Métodos helper para extraer claims del JWT de Keycloak
+   - ✅ `GetUserId()` - Extrae el claim "sub"
+   - ✅ `GetEmail()`, `GetName()`, `GetRoles()`
+   - ✅ `HasValidUserId()`, `HasRole(string role)`
+   - ✅ `GetClaimValue(string claimType)`
+
+**Validación:**
+- ✅ Compilación exitosa en 25.7 segundos
+- ✅ Sin errores, 1 advertencia no crítica (NuGet)
+- ✅ Extensión lista para Fase 2.5 y Fase 3
+
+**Tiempo real:** 0.75 horas
 
 ---
 

@@ -386,3 +386,21 @@ vamos con la fase 2.3 del desarrollo. lee todo el plan de desarrollo de contexto
 
 ```
 ### Resultado Entregado: ver plan de desarrollo para detalles. 
+
+
+## Prompt 8: Ejecución Fase 2
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.4 - Crear política de autorización
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 2.4 del plan de desarrollo. leelo todo y despues aplica cambios. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado:
+	src/Availability/Availability.Api/Extensions/ClaimsPrincipalExtensions.cs
+	Herramientas para extraer información del JWT
+	Métodos: GetUserId(), GetEmail(), GetName(), GetRoles(), HasValidUserId(), HasRole(), GetClaimValue()
