@@ -364,49 +364,32 @@ Se agregó la sección `JwtSettings` en `appsettings.json` con configuración pa
 
 ---
 
-#### Paso 2.3: Configurar JWT Bearer en Program.cs
-- Registrar `AddAuthentication()` y `AddJwtBearer()`
-- Configurar `AddAuthorization()`
-- Aplicar middleware `app.UseAuthentication()` y `app.UseAuthorization()`
+#### Paso 2.3: Configurar JWT Bearer en Program.cs ✅ COMPLETADO
 
-**Código de ejemplo:**
+Using Statements Agregados
+	using Microsoft.AspNetCore.Authentication;
+	using Microsoft.AspNetCore.Authentication.JwtBearer;
+	using Microsoft.IdentityModel.Tokens;
 
-```csharp
-// En Program.cs
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+Configuración JWT en Program.cs (Step 2-6)
+•	 Lectura de JwtSettings desde appsettings.json
+•	 Registro de AddAuthentication() con esquema Bearer predeterminado
+•	 Configuración de AddJwtBearer() con:
+	•	Authority desde configuración
+	•	Audience (availability-api)
+	•	RequireHttpsMetadata (parseado como bool con default true)
+	•	TokenValidationParameters con validación de firma y lifetime	
+•	 Registro de AddAuthorization()
+•	 Middleware correctamente posicionados:
+		1.	CorrelationIdMiddleware
+		2.	UseAuthentication() ← NUEVO
+		3.	UseAuthorization() ← NUEVO
+		4.	MapControllers()
 
-builder.Services
-	.AddAuthentication(options =>
-	{
-		options.DefaultAuthenticateScheme = "Bearer";
-		options.DefaultChallengeScheme = "Bearer";
-	})
-	.AddJwtBearer(options =>
-	{
-		options.Authority = jwtSettings["Authority"];
-		options.Audience = jwtSettings["Audience"];
-		options.RequireHttpsMetadata = bool.Parse(jwtSettings["RequireHttpsMetadata"] ?? "true");
-		options.TokenValidationParameters = new TokenValidationParameters
-		{
-			ValidateIssuerSigningKey = bool.Parse(jwtSettings["ValidateIssuerSigningKey"] ?? "true"),
-			ValidateLifetime = bool.Parse(jwtSettings["ValidateLifetime"] ?? "true")
-		};
-	});
-
-builder.Services.AddAuthorization();
-
-// ... resto de servicios ...
-
-var app = builder.Build();
-
-// Middleware
-app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
-```
+**Validación:**
+•	✅ Build exitoso en 30 segundos
+•	✅ Sin errores de compilación
+•	✅ 2 warnings de NuGet (no críticos, resolución de versiones)
 
 **Tiempo estimado:** 1 hora
 
@@ -709,7 +692,7 @@ namespace Availability.Api.Middleware
 ### Fase 2 ⏳ (EN PROGRESO)
 - [x] Agregar paquetes NuGet JWT Bearer ✅ **PASO 2.1 COMPLETADO**
 - [x] Configurar `appsettings.json` con JWT Settings ✅ **PASO 2.2 COMPLETADO**
-- [ ] Implementar `AddJwtBearer()` en `Program.cs`
+- [x] Implementar `AddJwtBearer()` en `Program.cs` ✅ **PASO 2.3 COMPLETADO**
 - [ ] Registrar middleware `UseAuthentication()` y `UseAuthorization()`
 - [ ] Implementar extracción de UserId desde claims JWT en controlador
 
