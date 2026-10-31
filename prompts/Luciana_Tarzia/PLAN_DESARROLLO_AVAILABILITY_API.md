@@ -315,17 +315,29 @@ public class CreateReservationUseCase : ICreateReservationRequestUseCase
 
 **Estimación:** 2.5 horas
 
-#### Paso 2.1: Agregar paquetes NuGet necesarios
-- `Microsoft.AspNetCore.Authentication.JwtBearer`
-- `System.IdentityModel.Tokens.Jwt`
+#### Paso 2.1: Agregar paquetes NuGet necesarios ✅ COMPLETADO
 
-**Comando:**
+- `Microsoft.AspNetCore.Authentication.JwtBearer` v8.0.0 ✅
+- `System.IdentityModel.Tokens.Jwt` v7.1.2 ✅
+
+**Descripción:**
+Se han agregado exitosamente los dos paquetes NuGet necesarios para la autenticación JWT en el archivo `Availability.Api.csproj`. Estos paquetes permiten:
+- **JwtBearer:** Validar automáticamente cada JWT recibido en los requests
+- **IdentityModel.Tokens:** Leer y extraer información desde los claims del JWT (user ID, roles, etc.)
+
+**Validación:**
+- ✅ Compilación exitosa en 48.7 segundos
+- ✅ Todas las dependencias resueltas correctamente
+- ✅ Paquetes compatibles con .NET 10.0
+
+**Comando ejecutado:**
 ```bash
-dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer --version 8.0.x
-dotnet add package System.IdentityModel.Tokens.Jwt --version 7.1.x
+dotnet build "src/Availability/Availability.Api/Availability.Api.csproj" --configuration Debug
 ```
 
-**Tiempo estimado:** 0.25 horas
+**Tiempo real:** 0.25 horas
+
+**Estado:** ✅ COMPLETADO
 
 ---
 
@@ -692,8 +704,8 @@ namespace Availability.Api.Middleware
 - [x] Crear clases DTO (Request, Response) ✅ **PASO 1.1**
 - [x] Configurar logging base en `Program.cs` (Serilog + Paquetes NuGet) ✅ **PASO 1.3 COMPLETADO**
 
-### Fase 2 ✅
-- [ ] Agregar paquetes NuGet JWT Bearer
+### Fase 2 ⏳ (EN PROGRESO)
+- [x] Agregar paquetes NuGet JWT Bearer ✅ **PASO 2.1 COMPLETADO**
 - [ ] Configurar `appsettings.json` con JWT Settings
 - [ ] Implementar `AddJwtBearer()` en `Program.cs`
 - [ ] Registrar middleware `UseAuthentication()` y `UseAuthorization()`
