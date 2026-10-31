@@ -19,7 +19,7 @@ public class GetEventsUseCase
 
         IReadOnlyList<EventSummaryDto> result = events
             .OrderBy(e => e.StartsAt)
-            .Select(e => new EventSummaryDto(e.Id, e.Name, e.StartsAt))
+            .Select(e => new EventSummaryDto(e.Id, e.Name, e.StartsAt, e.PriceCents, e.Currency))
             .ToList();
 
         return Result<IReadOnlyList<EventSummaryDto>>.Success(result);
