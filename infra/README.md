@@ -75,3 +75,19 @@ curl -s http://localhost:8081/realms/seat-reservation/protocol/openid-connect/to
 - Desde un contenedor, la metadata está en
   `http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration`.
 - Audience: el `clientId` del servicio que recibe la llamada (por ejemplo, Booking valida `aud=booking`).
+
+Al incorporar Booking al compose, configurar estas variables en su servicio:
+
+```yaml
+environment:
+  Authentication__Authority: http://localhost:8081/realms/seat-reservation
+  Authentication__MetadataAddress: http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration
+  Authentication__RequireHttpsMetadata: "false"
+```
+
+`Authority` conserva el issuer de los tokens; `MetadataAddress` usa el nombre accesible
+desde la red de Docker. El Keycloak del compose ya habilita el backchannel dinámico
+para publicar también una dirección interna de las claves de firma (`jwks_uri`).
+Permitir metadata por HTTP es una configuración explícita del entorno local del TP.
+Fuera de Development, Booking exige HTTPS por defecto y mantiene la validación de
+issuer, audiencia, vencimiento y firma. El compose actual solo levanta Keycloak.
