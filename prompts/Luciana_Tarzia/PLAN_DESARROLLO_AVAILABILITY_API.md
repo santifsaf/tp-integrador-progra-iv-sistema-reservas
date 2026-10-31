@@ -56,6 +56,153 @@ El microservicio `Availability.Api` actúa como la **puerta de entrada pública*
 
 ---
 
+## 🔴 OBSERVACIÓN CRÍTICA: Mapeo int ↔ Guid en Arquitectura Distribuida
+
+> **Estado:** Identificado en code review de Fase 1  
+> **Impacto:** Afecta diseño de controladores y casos de uso (Fase 3)  
+> **Resolución:** Será documentado en ARCHITECTURE.md antes de Fase 3
+
+### La Contradicción
+
+El sistema presenta una **dualidad de tipos** intencional:
+
+```
+DTOs de API (int)              Dominio Interno (Guid)
+┌──────────────────┐           ┌──────────────────┐
+│ EventId: int     │ ──────→ │ Event.Id: Guid   │
+│ SeatId: int      │ ──────→ │ Seat.Id: Guid    │
+└──────────────────┘           └──────────────────┘
+```
+
+**Razón:**
+- **Entrada (HTTP API):** Los clientes reciben `eventId=15` y `seatId=42` como `int` (del catálogo público de Eventos Service)
+- **Interno (Dominio):** El dominio trabaja con `Guid` internamente (fuente de verdad distribuida, única garantía en microservicios)
+
+**Consistencia con documentación del TP:**
+- ✅ Cumple con "compatibilidad con la API de Eventos y Asientos"
+- ✅ Mantiene GUID como "fonte de verdad" en Availability (ver TP documento consolidado, sección 2.1)
+
+### Dónde Ocurre la Conversión
+
+La conversión de tipos debe ocurrir en la **capa Application (UseCases)**, nunca en el controlador:
+
+**Flujo esperado:**
+
+1. **Cliente HTTP** → `POST /api/reservations { "eventId": 15, "seatId": 42 }`
+2. **Controlador recibe** → `CreateReservationRequest` con propiedades `int`
+3. **Controlador invoca** → `ICreateReservationUseCase.ExecuteAsync(int eventId, int seatId, Guid userId)`
+4. **UseCase internamente:**
+   - Valida que EventId (int) existe en repositorio → obtiene `Event` con `Guid`
+   - Valida que SeatId (int) existe en ese evento → obtiene `Seat` con `Guid`
+   - Crea `ReservationRequest` entity con IDs como `Guid`
+5. **Respuesta** → `ReservationResponse` con `requestId` como `Guid` (string en JSON)
+
+**El mapeo NO es explícito una conversión `int.ToGuid()`, sino:**
+- Consultar qué `Guid` real corresponde a ese `int` externo
+- Usar ese `Guid` en el dominio
+
+### Métodos de Repositorio Necesarios (Fase 3)
+
+Para implementar esta conversión, se necesitarán métodos adicionales:
+
+```csharp
+// En Availability.Application/Abstractions/IEventRepository.cs
+public interface IEventRepository
+{
+    Task<Event?> GetByIdAsync(Guid eventId, CancellationToken ct);
+
+    // 🔴 NUEVO: Conversión int → Guid
+    /// <summary>
+    /// Obtiene un evento por su ID externo (int del servicio de Eventos).
+    /// 
+    /// Esta es la "puerta de entrada" que convierte:
+    /// int (del cliente) → Guid (del dominio)
+    /// </summary>
+    Task<Event?> GetByExternalIdAsync(int externalEventId, CancellationToken ct);
+}
+
+// En Availability.Application/Abstractions/ISeatRepository.cs
+public interface ISeatRepository
+{
+    Task<IReadOnlyList<Seat>> GetByEventAsync(Guid eventId, CancellationToken ct);
+    Task<bool> ExistsAsync(Guid eventId, Guid seatId, CancellationToken ct);
+
+    // 🔴 NUEVO: Conversión int, int → Seat con Guid
+    /// <summary>
+    /// Valida que un asiento existe por IDs externos (int).
+    /// Retorna la entidad Seat con Guid internos.
+    /// </summary>
+    Task<Seat?> GetByExternalIdsAsync(int externalEventId, int externalSeatId, CancellationToken ct);
+}
+```
+
+### Ejemplo de Implementación en UseCase (Fase 3)
+
+```csharp
+public class CreateReservationUseCase : ICreateReservationRequestUseCase
+{
+    private readonly IEventRepository _eventRepository;
+    private readonly ISeatRepository _seatRepository;
+    private readonly IReservationRequestRepository _reservationRepository;
+    private readonly IReservationPublisher _publisher;
+
+    public async Task<RequestReceivedDto> ExecuteAsync(
+        int eventId,          // ← int de la API
+        int seatId,           // ← int de la API
+        Guid userId,          // ← Guid del JWT
+        CancellationToken ct)
+    {
+        // PASO 1: Convertir int → Guid usando repositorio
+        var event = await _eventRepository.GetByExternalIdAsync(eventId, ct);
+        if (event == null)
+            throw new DomainException("EventoNoEncontrado");
+
+        var seat = await _seatRepository.GetByExternalIdsAsync(eventId, seatId, ct);
+        if (seat == null)
+            throw new DomainException("AsientoNoEncontrado");
+
+        // PASO 2: Ahora trabajamos con Guid
+        var reservationRequest = new ReservationRequest
+        {
+            Id = Guid.NewGuid(),
+            EventId = event.Id,        // ✅ Guid (obtenido del repositorio)
+            SeatId = seat.Id,          // ✅ Guid (obtenido del repositorio)
+            UserId = userId,           // ✅ Guid (del JWT)
+            Status = RequestStatus.Received,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // PASO 3: Persistir y publicar
+        await _reservationRepository.SaveAsync(reservationRequest, ct);
+        await _publisher.PublishAsync(reservationRequest, ct);
+
+        return new RequestReceivedDto(
+            reservationRequest.Id,
+            nameof(RequestStatus.Received)
+        );
+    }
+}
+```
+
+### Riesgos a Mitigar
+
+| Riesgo | Impacto | Mitigación |
+|--------|---------|-----------|
+| **EventId (int) inexistente** | Excepción en validación | `GetByExternalIdAsync()` retorna null si no existe |
+| **SeatId (int) pertenece a otro evento** | Validación incorrecta | `GetByExternalIdsAsync()` valida ambos IDs juntos |
+| **Desincronización: Evento eliminado en servicio Eventos** | Referencias rotas | No manejable en Availability (delegado a Booking después) |
+| **Confusión en código: ¿int o Guid?** | Bugs de asignación | Documentar con XML comments en DTOs |
+
+### Pendiente de Documentación Formal
+
+- [ ] Crear `docs/ARCHITECTURE.md` con sección "Mapeo de IDs: int ↔ Guid"
+- [ ] Agregar XML comments en `CreateReservationRequest.cs`
+- [ ] Documentar contrato de `GetByExternalIdAsync()` y `GetByExternalIdsAsync()`
+
+> ⚠️ **NO se realizarán cambios de código hasta Fase 3**, solo se documenta aquí la decisión tomada para que sea explícita desde ahora.
+
+---
+
 ## Desglose del Plan: 4 Fases
 
 ### **FASE 1: Setup, DTOs y Middlewares Base**
