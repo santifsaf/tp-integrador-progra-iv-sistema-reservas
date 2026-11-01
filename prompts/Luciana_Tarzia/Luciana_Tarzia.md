@@ -474,3 +474,26 @@ vamos con la fase 2.3 del desarrollo. lee todo el plan de desarrollo de contexto
 
  ```
  ### Resultado Entregado: etiquetas (atributos) en controladores, validación de datos, respuestas de error estándar
+
+
+
+## Prompt 13: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** Reorganizar plan de desarrollo de fase 4. Fases 4.1 y 4.2 estaban casi completadas y las siguientes fases también. Revisar faltantes
+
+### Contenido del Prompt Original:
+ 
+ ```
+ quiero que elimines los puntos 4.3 y 4.4 del plan de desarrollo adjunto y reformules un nuevo 4.3 con algunos detalles que faltan.
+- crear ExceptionHandlingMiddleware.cs y registrar en program y corregir el orden de middleware
+- arreglar el problema de patron:
+El plan habla de método `AddApplicationServices()` pero el código actual:
+-  No llama a `Availability.Application.DependencyInjection.AddApplication()`
+-  Registra los servicios manualmente en Program.cs (líneas 47-50)
+ La clase `DependencyInjection` está preparada pero no se usa: Usar el método DependencyInjection existente 
+- revisar DateTime en GetReservationStatusResponse: Verificar que el controlador mapee los valores reales desde `RequestStatusDto` del UseCase, no use `DateTime.UtcNow`.
+
+ ```
+ ### Resultado Entregado: nuevo plan de desarrollo para fase 4. 

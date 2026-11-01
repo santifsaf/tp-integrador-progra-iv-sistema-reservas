@@ -554,125 +554,96 @@ Archivos Modificados
 ### **FASE 4: Inyección de Dependencias y Manejo de Errores**
 **Objetivo:** Conectar la API con los casos de uso, configurar DI y establecer estrategia de manejo de errores.
 
+
+## Paso 4.1:
+
+**SeatAvailabilityController.cs** (Endpoint GET /api/events/{eventId}/seats)
+- ✅ Validación de eventId > 0 → 400 Bad Request
+- ✅ Extracción de CorrelationId desde HttpContext.Items
+- ✅ Llamada a IGetSeatsAvailabilityUseCase
+- ✅ Mapeo SeatMapDto → List<GetSeatsResponse>
+- ✅ Manejo de errores: 404 (NotFound), 503 (ServiceUnavailable), 408 (Timeout)
+- ✅ Logging completo con trazabilidad
+
+**ReservationsController.cs** (Endpoints POST + GET)
+- ✅ **POST /api/reservations**
+  - ✅ Validación ModelState
+  - ✅ Validación eventId, seatId > 0
+  - ✅ Extracción userId desde JWT claims con User.GetUserId()
+  - ✅ Validación Guid.TryParse(userId)
+  - ✅ Conversión int→Guid (temporal con ConvertExternalEventIdToGuid)
+  - ✅ Llamada a ICreateReservationRequestUseCase
+  - ✅ Retorna **202 Accepted** (no 200 OK) ← Procesamiento asincrónico
+  - ✅ Manejo errores: 400, 401, 403, 404, 409, 503
+
+- ✅ **GET /api/reservations/{requestId:guid}**
+  - ✅ Validación GUID en route constraint `:guid`
+  - ✅ Extracción userId desde JWT
+  - ✅ Llamada a IGetReservationStatusUseCase
+  - ✅ Retorna 200 OK con GetReservationStatusResponse
+  - ✅ Manejo errores: 400, 401, 403, 404, 503
+
+**Interfaces de Casos de Uso** (Already defined, Fase 3)
+- ✅ IGetSeatsAvailabilityUseCase.ExecuteAsync(int eventId, CancellationToken)
+- ✅ ICreateReservationRequestUseCase.ExecuteAsync(Guid userId, Guid eventId, Guid seatId, CancellationToken)
+- ✅ IGetReservationStatusUseCase.ExecuteAsync(Guid requestId, Guid userId, CancellationToken)
+
+**Utilidades & Extensiones**
+- ✅ ClaimsPrincipalExtensions.GetUserId() - Extrae claim "sub" desde JWT
+- ✅ ErrorResponse - Estructura estándar con code, message, correlationId, details
+- ✅ CorrelationIdMiddleware - Genera UUIDs si no existen en headers
+
+**Documentación**
+- ✅ USAGE_GUIDE_CLAIMS_EXTENSIONS.md - Guía de uso de métodos de claims
+- ✅ PATRONES_CLAIMS_JWT_FASE4.md - **NUEVA** - Patrones validados y checklist
+
+### 📊 Resultados de Compilación
+
+```
+✅ Compilación correcta. 0 Errores
+⚠️  1 Advertencia inofensiva (System.IdentityModel.Tokens.Jwt version mismatch)
+```
+
+---
+
+## Paso 4.2: DTOs Especializados
+
+**Meta:** Definir y validar DTOs especializados con data annotations  
+**Estado:** ✅ **COMPLETADA** (29 de octubre de 2026)
+
+### ✅ Objetivos Cumplidos
+
+**DTOs de Solicitud (Requests):**
+- ✅ `CreateReservationRequest.cs`
+  - ✅ [Required] + [Range(1, int.MaxValue)] en EventId y SeatId
+  - ✅ Mensajes de error personalizados
+  - ✅ Validación automática en ModelState del controlador
+
+**DTOs de Respuesta (Responses):**
+- ✅ `GetSeatsResponse.cs` - SeatId, Status, EventId
+- ✅ `ReservationResponse.cs` - RequestId, Status, Message (202 Accepted)
+- ✅ `GetReservationStatusResponse.cs` - RequestId, Status, CreatedAt, UpdatedAt
+- ✅ `ErrorResponse.cs` - Code, Message, CorrelationId, Details + 2 constructores
+
+**Documentación:**
+- ✅ `ESTRUCTURA_DTOS_FASE4_2.md` (376 líneas) - Especificación completa
+  - ✅ Estructura de cada DTO con ejemplos
+  - ✅ Data annotations y validaciones
+  - ✅ Mapeos entre capas (Guid ↔ int)
+  - ✅ Códigos HTTP y casos de error
+  - ✅ Checklist de completitud
+
+**Mapeos Validados:**
+- ✅ CreateReservationRequest → ICreateReservationRequestUseCase
+- ✅ SeatMapDto → GetSeatsResponse (con conversión Guid → int)
+- ✅ RequestReceivedDto → ReservationResponse
+- ✅ RequestStatusDto → GetReservationStatusResponse
+
+**Compilación:**
+- ✅ 0 Errores | 1 advertencia inofensiva (System.IdentityModel.Tokens.Jwt version mismatch)
+
 **Estimación:** 2 horas
 
-#### Paso 4.1: Definir contratos de casos de uso en Application
-- **Interfaces a crear en `Availability.Application/UseCases/`:**
-  - `IGetSeatsAvailabilityUseCase` - Retorna lista de asientos
-  - `ICreateReservationRequestUseCase` - Crea solicitud y retorna requestId
-  - `IGetReservationStatusUseCase` - Retorna estado de solicitud
-
-- **Retornos esperados:**
-  - `GetSeatsAvailabilityUseCase` → `GetSeatsAvailabilityOutput` (List<SeatDto>)
-  - `CreateReservationRequestUseCase` → `CreateReservationRequestOutput` (RequestId, Status)
-  - `GetReservationStatusUseCase` → `GetReservationStatusOutput` (RequestId, Status, CreatedAt, UpdatedAt)
-
-**Nota:** Los casos de uso serán mockeados o implementados en capas de Infraestructura (fuera del alcance actual).
-
-**Tiempo estimado:** 0.75 horas
-
----
-
-#### Paso 4.2: Registrar dependencias en Program.cs
-- Agregar extensión `builder.Services.AddApplicationServices()`
-- Registrar casos de uso e interfaces
-- Registrar servicios auxiliares (logging, etc.)
-
-**Código de ejemplo:**
-
-```csharp
-// En Program.cs
-builder.Services
-	.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>()
-	.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>()
-	.AddScoped<IGetReservationStatusUseCase, GetReservationStatusUseCase>();
-
-// O mediante extensión en Application:
-builder.Services.AddApplicationServices();
-```
-
-**Tiempo estimado:** 0.5 horas
-
----
-
-#### Paso 4.3: Implementar middleware de manejo global de excepciones
-- **Ubicación:** `Availability.Api/Middleware/ExceptionHandlingMiddleware.cs`
-- **Comportamiento:**
-  - Capturar excepciones no controladas
-  - Loguear con CorrelationId
-  - Retornar `ErrorResponse` con StatusCode 500
-
-**Tiempo estimado:** 0.5 horas
-
-**Código de ejemplo:**
-
-```csharp
-using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
-
-namespace Availability.Api.Middleware
-{
-	public class ExceptionHandlingMiddleware
-	{
-		private readonly RequestDelegate _next;
-		private readonly ILogger<ExceptionHandlingMiddleware> _logger;
-
-		public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
-		{
-			_next = next;
-			_logger = logger;
-		}
-
-		public async Task InvokeAsync(HttpContext context)
-		{
-			try
-			{
-				await _next(context);
-			}
-			catch (Exception ex)
-			{
-				var correlationId = context.Items["CorrelationId"]?.ToString() ?? "unknown";
-				_logger.LogError(ex,
-					"Excepción no controlada | CorrelationId: {CorrelationId} | Message: {Message}",
-					correlationId,
-					ex.Message);
-
-				context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-				context.Response.ContentType = "application/json";
-
-				var response = new
-				{
-					code = "INTERNAL_SERVER_ERROR",
-					message = "Error interno del servidor",
-					correlationId = correlationId
-				};
-
-				await context.Response.WriteAsJsonAsync(response);
-			}
-		}
-	}
-}
-```
-
-**Tiempo estimado:** 0.5 horas
-
----
-
-#### Paso 4.4: Validar configuración y pruebas funcionales básicas
-- Verificar que los endpoints responden correctamente
-- Validar que la autenticación JWT funciona
-- Confirmar que Correlation ID se propaga
-- Revisar logs de auditoría
-
-**Tiempo estimado:** 0.25 horas
-
----
-
-**Subtotal Fase 4: 2 horas**
-
----
 
 ## Resumen de Estimaciones
 
@@ -708,14 +679,228 @@ namespace Availability.Api.Middleware
 - [x] Validar `ModelState` en cada acción ✅  - Implementado en ambos controladores
 - [x] Crear clase `ErrorResponse` ✅  - Clase creada con propiedades Code, Message, CorrelationId, Details
 
-### Fase 4 ✅
-- [ ] Definir interfaces de casos de uso en `Availability.Application`
-- [ ] Registrar dependencias en `Program.cs`
-- [ ] Implementar `ExceptionHandlingMiddleware.cs`
-- [ ] Registrar middleware en `Program.cs`
-- [ ] Validar que endpoints responden correctamente
-- [ ] Confirmar JWT funciona (401 sin token, 200 con token válido)
-- [ ] Revisar logs de auditoría y Correlation ID
+
+### Fase 4 🔵 (EN PROGRESO: Controladores e Integración)
+
+#### **Fase 4.1: Implementar Controladores REST** (✅ COMPLETADA)
+**Objetivo:** Crear `SeatAvailabilityController` y `ReservationsController` con lógica básica
+- [x] Crear `Controllers/SeatAvailabilityController.cs` con `GET /api/events/{eventId}/seats` ✅
+- [x] Crear `Controllers/ReservationsController.cs` con:
+  - [x] `POST /api/reservations` (crear reserva con respuesta 202) ✅
+  - [x] `GET /api/reservations/{requestId}` (consultar estado) ✅
+- [x] Aplicar atributos `[ApiController]`, `[Route]`, `[Authorize]` ✅
+- [x] Extraer `UserId` desde JWT claims en ambos controladores ✅
+- [x] Validar `ModelState` y retornar errores 400 cuando sea necesario ✅
+- [x] Llamar a casos de uso (interfaces) - sin implementación real aún ✅
+- [x] Compilación validada sin errores ✅
+
+#### **Fase 4.2: Modelos DTOs y Respuestas** (✅ **COMPLETADA**)
+**Objetivo:** Definir estructuras de solicitud y respuesta con data annotations
+- [x] CreateReservationRequest.cs - con [Required] y [Range] ✅
+- [x] GetSeatsResponse.cs - estructura validada ✅
+- [x] ReservationResponse.cs - estructura validada ✅
+- [x] GetReservationStatusResponse.cs - estructura validada ✅
+- [x] ErrorResponse.cs - estructura validada con 2 constructores ✅
+- [x] Compilación sin errores ✅
+
+#### **Fase 4.3: Middleware, Manejo de Errores e Inyección de Dependencias** (⏳ Pendiente)
+
+**Objetivo:** Completar la configuración de middleware, manejo global de excepciones y optimizar inyección de dependencias
+
+**Sub-tarea 4.3.1: Crear ExceptionHandlingMiddleware** ✅ CRÍTICO
+
+**Archivo:** `Availability.Api/Middleware/ExceptionHandlingMiddleware.cs`
+
+**Descripción:**
+- Crear nuevo middleware que capture excepciones no controladas en el pipeline
+- Loguear la excepción con CorrelationId para auditoría y debugging
+- Retornar respuesta estándar `ErrorResponse` (HTTP 500)
+- Evitar que excepciones genéricas retornen HTML de ASP.NET Core
+
+**Especificación técnica:**
+```csharp
+public class ExceptionHandlingMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+
+    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger) 
+    { 
+        // Inyectar dependencias
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
+        {
+            await _next(context);
+        }
+        catch (Exception ex)
+        {
+            // 1. Extraer CorrelationId desde context.Items
+            // 2. Loguear excepción: LogError(ex, "mensaje | CorrelationId: {CorrelationId}")
+            // 3. Asignar HTTP 500
+            // 4. Retornar ErrorResponse con code="INTERNAL_SERVER_ERROR"
+        }
+    }
+}
+```
+
+- [ ] Crear archivo `ExceptionHandlingMiddleware.cs` (~45-50 líneas)
+- [ ] Usar `ErrorResponse` para serializar respuesta
+- [ ] Incluir CorrelationId en cada log de error
+
+---
+
+**Sub-tarea 4.3.2: Corregir orden de Middleware en Program.cs** ✅ CRÍTICO
+
+**Ubicación:** `Availability.Api/Program.cs` (líneas ~78-82)
+
+**Problema actual:**
+```csharp
+app.UseMiddleware<CorrelationIdMiddleware>();    // ← INCORRECTO: debe ir SEGUNDO
+app.UseAuthentication();
+app.UseAuthorization();
+// app.UseMiddleware<ExceptionHandlingMiddleware>(); ← FALTA REGISTRAR
+```
+
+**Orden CORRECTO del middleware (IMPORTANTE):**
+```csharp
+// 1. PRIMERO: Captura excepciones de TODO lo que viene después
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// 2. SEGUNDO: Genera/propaga CorrelationId para trazabilidad
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// 3. TERCERO: Valida tokens JWT
+app.UseAuthentication();
+
+// 4. CUARTO: Verifica permisos
+app.UseAuthorization();
+
+// 5. Finalmente: Mapear controladores
+app.MapControllers();
+```
+
+**Razón del orden:**
+- ExceptionHandlingMiddleware primero = atrapa excepciones de TODOS los middleware posteriores
+- CorrelationIdMiddleware segundo = genera IDs antes de autenticación/autorización
+- Auth third = valida JWT
+
+- [ ] Reordenar líneas de middleware en `Program.cs`
+- [ ] Registrar `app.UseMiddleware<ExceptionHandlingMiddleware>();` ANTES de CorrelationIdMiddleware
+- [ ] Compilar sin errores
+
+---
+
+**Sub-tarea 4.3.3: Refactorizar inyección de dependencias (Patrón DependencyInjection)** ✅ IMPORTANTE
+
+**Problema actual (patrón no escalable):**
+
+En `Program.cs` líneas 47-50, se registran servicios manualmente:
+```csharp
+builder.Services.AddScoped<GetSeatMapUseCase>();
+builder.Services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
+builder.Services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
+builder.Services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
+```
+
+**Existe alternativa (clase DependencyInjection preparada):**
+
+`Availability.Application/DependencyInjection.cs` define:
+```csharp
+public static class DependencyInjection
+{
+    public static IServiceCollection AddApplication(this IServiceCollection services)
+    {
+        services.AddScoped<GetEventsUseCase>();
+        services.AddScoped<GetSeatMapUseCase>();
+        services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
+        services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
+        services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
+        services.AddScoped<GetUserRequestsUseCase>();
+        return services;
+    }
+}
+```
+
+**Solución (Patrón recomendado):**
+
+Reemplazar el registro manual con llamada a método `AddApplication()`:
+
+```csharp
+// Reemplazar esto:
+builder.Services.AddScoped<GetSeatMapUseCase>();
+builder.Services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
+builder.Services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
+builder.Services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
+
+// Con esto:
+builder.Services.AddApplication();  // ← Una línea, más escalable
+```
+
+**Ventajas:**
+- ✅ Escalabilidad: Agregar nuevos UseCases solo requiere editar `DependencyInjection.cs`
+- ✅ Separación de responsabilidades: La configuración de Application layer vive en Application
+- ✅ Reutilizable: Otros proyectos pueden importar el método
+
+- [ ] Agregar `using Availability.Application;` en `Program.cs`
+- [ ] Reemplazar 4 líneas de registro manual por: `builder.Services.AddApplication();`
+- [ ] Verificar que compilación sigue siendo correcta
+- [ ] Validar en runtime que inyección funciona (endpoints responden)
+
+---
+
+**Sub-tarea 4.3.4: Verificar mapeo de DateTime en GetReservationStatusResponse** ✅ IMPORTANTE
+
+**Ubicación:** `Availability.Api/Controllers/ReservationsController.cs` (método GetReservationStatus)
+
+**Problema identificado:**
+
+```
+DateTime.UtcNow → CreatedAt, UpdatedAt (TODO: Usar valores del UseCase)
+```
+
+Esto sugiere que el controlador podría estar usando `DateTime.UtcNow` en lugar de mapear desde `RequestStatusDto`.
+
+**Verificación necesaria:**
+
+1. ✅ El UseCase `GetRequestStatusUseCase` retorna `RequestStatusDto` con propiedades `CreatedAt` y `UpdatedAt`
+2. ✅ El controlador mapea `RequestStatusDto.CreatedAt` → `GetReservationStatusResponse.CreatedAt`
+3. ✅ El controlador mapea `RequestStatusDto.UpdatedAt` → `GetReservationStatusResponse.UpdatedAt`
+4. ❌ NO usa `DateTime.UtcNow` (valor actual) sino valores reales del domain model
+
+**Especificación correcta:**
+```csharp
+// En ReservationsController.GetReservationStatus()
+var statusDto = await _getReservationStatusUseCase.ExecuteAsync(requestId, userId, cancellationToken);
+
+// Mapeo correcto:
+var response = new GetReservationStatusResponse
+{
+    RequestId = statusDto.RequestId.ToString("D"),  // GUID externo → string
+    Status = statusDto.Status,
+    CreatedAt = statusDto.CreatedAt,                // ← DEL DOMAIN, NO DateTime.UtcNow
+    UpdatedAt = statusDto.UpdatedAt                 // ← DEL DOMAIN, NO DateTime.UtcNow
+};
+```
+
+- [ ] Revisar controlador `ReservationsController.GetReservationStatus()`
+- [ ] Confirmar que mapea `RequestStatusDto.CreatedAt` y `RequestStatusDto.UpdatedAt`
+- [ ] NO usar `DateTime.UtcNow` (usar valores del UseCase)
+- [ ] Si hay asignaciones de `DateTime.UtcNow`, reemplazar por valores del DTO
+
+---
+
+**Tiempo estimado:** 1.0 hora (0.5h middleware + 0.3h DependencyInjection + 0.2h validaciones)
+
+**Deliverables:**
+- ✅ `ExceptionHandlingMiddleware.cs` creado y registrado
+- ✅ Middleware reordenado en `Program.cs`
+- ✅ Inyección de dependencias refactorizada usando `AddApplication()`
+- ✅ Verificación de mapeo de DateTime completada
+- ✅ Compilación sin errores
+- ✅ Pruebas funcionales básicas de manejo de errores
 
 ---
 
