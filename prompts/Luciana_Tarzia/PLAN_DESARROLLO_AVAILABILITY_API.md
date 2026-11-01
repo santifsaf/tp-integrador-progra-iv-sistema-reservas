@@ -527,13 +527,29 @@ Archivos Modificados
 
 ---
 
-#### Paso 3.3: Configurar rutas y atributos globales
-- Aplicar `[ApiController]` en controladores
-- Definir `[Route("api/[controller]")]`
-- Configurar `[Produces("application/json")]`
-- Aplicar `[ApiVersion]` si se requiere versionado
+#### Paso 3.3: Configurar rutas y atributos globales ✅ COMPLETADO
 
-**Tiempo estimado:** 0.25 horas
+✅ Controladores:
+•	SeatAvailabilityController: Completamente implementado con validación, logging y manejo de errores
+•	ReservationsController: Completamente implementado con 2 endpoints (POST para crear, GET para status)
+✅ DTOs de Respuesta:
+•	ErrorResponse: Contiene Code, Message, CorrelationId y Details opcional
+•	ReservationResponse: Contiene RequestId, Status y Message
+•	GetReservationStatusResponse: Contiene RequestId, Status, CreatedAt y UpdatedAt
+✅ Manejo de Errores:
+•	Todas las respuestas incluyen CorrelationId para trazabilidad
+•	Códigos de error específicos (INVALID_EVENT_ID, EVENT_NOT_FOUND, etc.)
+•	Logging estructurado con información de contexto
+✅ Autenticación y Autorización:
+•	JWT validación mediante [Authorize] en ReservationsController
+•	Extracción de UserId desde JWT claims
+•	Validación que UserId es un Guid válido
+✅ Validaciones:
+•	Validación de ModelState (DTOs incorrectos)
+•	Validación de IDs > 0 (valores inválidos)
+•	Validación de Guid para requestId
+
+**Tiempo real:** 0.50 horas
 
 ---
 
@@ -711,7 +727,7 @@ namespace Availability.Api.Middleware
 ### Fase 3 ✅
 - [x] Crear `SeatAvailabilityController` con endpoint `GET /api/events/{eventId}/seats`
 - [x] Crear `ReservationsController` con endpoints `POST /api/reservations` y `GET /api/reservations/{requestId}`
-- [ ] Aplicar atributos `[ApiController]`, `[Route]`, `[Authorize]`
+- [x] Aplicar atributos `[ApiController]`, `[Route]`, `[Authorize]`
 - [ ] Validar `ModelState` en cada acción
 - [ ] Crear clase `ErrorResponse`
 

@@ -89,7 +89,12 @@ public class ReservationsController : ControllerBase
             _logger.LogWarning(
                 "Solicitud de reserva rechazada: validación fallida | CorrelationId={CorrelationId}",
                 correlationId);
-            return BadRequest(ModelState);
+            var errorResponse = new ErrorResponse(
+                "INVALID_MODEL",
+                "Los datos de la solicitud son inválidos",
+                correlationId,
+                ModelState.ToString());
+            return BadRequest(errorResponse);
         }
 
         // Validación: EventId y SeatId deben ser mayores a 0
@@ -101,7 +106,11 @@ public class ReservationsController : ControllerBase
                 request.EventId,
                 request.SeatId,
                 correlationId);
-            return BadRequest(new { error = "EventId y SeatId deben ser mayores a 0" });
+            var errorResponse = new ErrorResponse(
+                "INVALID_IDS",
+                "EventId y SeatId deben ser mayores a 0",
+                correlationId);
+            return BadRequest(errorResponse);
         }
 
         // Extaer userId del JWT
@@ -112,7 +121,11 @@ public class ReservationsController : ControllerBase
             _logger.LogWarning(
                 "Solicitud de reserva rechazada: UserId inválido en JWT | CorrelationId={CorrelationId}",
                 correlationId);
-            return Unauthorized(new { error = "UserId inválido en token JWT" });
+            var errorResponse = new ErrorResponse(
+                "INVALID_USER_ID",
+                "UserId inválido en token JWT",
+                correlationId);
+            return Unauthorized(errorResponse);
         }
 
         var correlationIdLog = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
@@ -150,26 +163,42 @@ public class ReservationsController : ControllerBase
 
                 if (result.Error == AppError.NotFound)
                 {
-                    return NotFound(new { error = "Evento o asiento no encontrado" });
+                    var errorResponse = new ErrorResponse(
+                        "EVENT_OR_SEAT_NOT_FOUND",
+                        "El evento o asiento especificado no existe",
+                        correlationIdLog);
+                    return NotFound(errorResponse);
                 }
 
                 if (result.Error == AppError.Forbidden)
                 {
+                    var errorResponse = new ErrorResponse(
+                        "FORBIDDEN",
+                        "No tiene permiso para realizar esta acción",
+                        correlationIdLog);
                     return StatusCode(
                         StatusCodes.Status403Forbidden,
-                        new { error = "No tiene permiso para realizar esta acción" });
+                        errorResponse);
                 }
 
                 if (result.Error == AppError.Unavailable)
                 {
+                    var errorResponse = new ErrorResponse(
+                        "SERVICE_UNAVAILABLE",
+                        "El servicio de reservas no está disponible",
+                        correlationIdLog);
                     return StatusCode(
                         StatusCodes.Status503ServiceUnavailable,
-                        new { error = "Servicio de reservas no disponible" });
+                        errorResponse);
                 }
 
+                var internalErrorResponse = new ErrorResponse(
+                    "INTERNAL_ERROR",
+                    "Error al procesar la solicitud",
+                    correlationIdLog);
                 return StatusCode(
                     StatusCodes.Status500InternalServerError,
-                    new { error = "Error al procesar la solicitud" });
+                    internalErrorResponse);
             }
 
             var requestFromUseCase = result.Value;
@@ -182,9 +211,13 @@ public class ReservationsController : ControllerBase
                     request.SeatId,
                     correlationIdLog);
 
+                var errorResponse = new ErrorResponse(
+                    "NULL_RESULT",
+                    "Resultado nulo inesperado",
+                    correlationIdLog);
                 return StatusCode(
                     StatusCodes.Status500InternalServerError,
-                    new { error = "Error al procesar la solicitud" });
+                    errorResponse);
             }
 
             // Mapear resultado a DTO de respuesta
@@ -207,26 +240,36 @@ public class ReservationsController : ControllerBase
         }
         catch (OperationCanceledException)
         {
+            var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
             _logger.LogWarning(
                 "Solicitud de reserva cancelada | UserId={UserId} | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
                 userId,
                 request.EventId,
                 request.SeatId,
-                correlationIdLog);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = "Solicitud expirada" });
+                correlationId);
+            var errorResponse = new ErrorResponse(
+                "REQUEST_TIMEOUT",
+                "La solicitud expiró",
+                correlationId);
+            return StatusCode(StatusCodes.Status408RequestTimeout, errorResponse);
         }
         catch (Exception ex)
         {
+            var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
             _logger.LogError(
                 ex,
                 "Error no controlado al crear solicitud de reserva | UserId={UserId} | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
                 userId,
                 request.EventId,
                 request.SeatId,
-                correlationIdLog);
+                correlationId);
+            var errorResponse = new ErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "Error interno del servidor",
+                correlationId);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                new { error = "Error interno del servidor" });
+                errorResponse);
         }
     }
 
@@ -282,7 +325,11 @@ public class ReservationsController : ControllerBase
             _logger.LogWarning(
                 "Consulta de estado rechazada: UserId inválido en JWT | CorrelationId={CorrelationId}",
                 correlationId);
-            return Unauthorized(new { error = "UserId inválido en token JWT" });
+            var errorResponse = new ErrorResponse(
+                "INVALID_USER_ID",
+                "UserId inválido en token JWT",
+                correlationId);
+            return Unauthorized(errorResponse);
         }
 
         var correlationIdLog = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
@@ -312,26 +359,42 @@ public class ReservationsController : ControllerBase
 
                 if (result.Error == AppError.NotFound)
                 {
-                    return NotFound(new { error = "Solicitud de reserva no encontrada" });
+                    var errorResponse = new ErrorResponse(
+                        "RESERVATION_NOT_FOUND",
+                        "Solicitud de reserva no encontrada",
+                        correlationIdLog);
+                    return NotFound(errorResponse);
                 }
 
                 if (result.Error == AppError.Forbidden)
                 {
+                    var errorResponse = new ErrorResponse(
+                        "FORBIDDEN",
+                        "No puede consultar el estado de esta solicitud",
+                        correlationIdLog);
                     return StatusCode(
                         StatusCodes.Status403Forbidden,
-                        new { error = "No puede consultar el estado de esta solicitud" });
+                        errorResponse);
                 }
 
                 if (result.Error == AppError.Unavailable)
                 {
+                    var errorResponse = new ErrorResponse(
+                        "SERVICE_UNAVAILABLE",
+                        "El servicio de booking no está disponible",
+                        correlationIdLog);
                     return StatusCode(
                         StatusCodes.Status503ServiceUnavailable,
-                        new { error = "Servicio de booking no disponible" });
+                        errorResponse);
                 }
 
+                var internalErrorResponse = new ErrorResponse(
+                    "INTERNAL_ERROR",
+                    "Error al procesar la solicitud",
+                    correlationIdLog);
                 return StatusCode(
                     StatusCodes.Status500InternalServerError,
-                    new { error = "Error al procesar la solicitud" });
+                    internalErrorResponse);
             }
 
             var statusFromUseCase = result.Value;
@@ -343,9 +406,13 @@ public class ReservationsController : ControllerBase
                     userId,
                     correlationIdLog);
 
+                var errorResponse = new ErrorResponse(
+                    "NULL_RESULT",
+                    "Resultado nulo inesperado",
+                    correlationIdLog);
                 return StatusCode(
                     StatusCodes.Status500InternalServerError,
-                    new { error = "Error al procesar la solicitud" });
+                    errorResponse);
             }
 
             // Mapear resultado a DTO de respuesta
@@ -368,24 +435,34 @@ public class ReservationsController : ControllerBase
         }
         catch (OperationCanceledException)
         {
+            var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
             _logger.LogWarning(
                 "Consulta de estado cancelada | RequestId={RequestId} | UserId={UserId} | CorrelationId={CorrelationId}",
                 requestId,
                 userId,
-                correlationIdLog);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = "Solicitud expirada" });
+                correlationId);
+            var errorResponse = new ErrorResponse(
+                "REQUEST_TIMEOUT",
+                "La solicitud expiró",
+                correlationId);
+            return StatusCode(StatusCodes.Status408RequestTimeout, errorResponse);
         }
         catch (Exception ex)
         {
+            var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
             _logger.LogError(
                 ex,
                 "Error no controlado al obtener estado de solicitud | RequestId={RequestId} | UserId={UserId} | CorrelationId={CorrelationId}",
                 requestId,
                 userId,
-                correlationIdLog);
+                correlationId);
+            var errorResponse = new ErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "Error interno del servidor",
+                correlationId);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                new { error = "Error interno del servidor" });
+                errorResponse);
         }
     }
 

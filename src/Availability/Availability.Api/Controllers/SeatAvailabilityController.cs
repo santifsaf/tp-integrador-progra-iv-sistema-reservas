@@ -1,6 +1,6 @@
+using Availability.Api.DTOs.Responses;
 using Availability.Application.Abstractions;
 using Availability.Application.Common;
-using Availability.Api.DTOs.Responses;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Availability.Api.Controllers;
@@ -35,31 +35,6 @@ public class SeatAvailabilityController : ControllerBase
     /// 404 Not Found: Evento no encontrado
     /// 503 Service Unavailable: Servicio de reservas no disponible
     /// </returns>
-    /// <remarks>
-    /// Endpoint público (sin autenticación requerida).
-    /// 
-    /// Ejemplo de request:
-    /// ```
-    /// GET /api/events/15/seats
-    /// ```
-    /// 
-    /// Ejemplo de respuesta (200 OK):
-    /// ```json
-    /// {
-    ///   "eventId": 15,
-    ///   "seats": [
-    ///     {
-    ///       "seatId": 1,
-    ///       "status": "AVAILABLE"
-    ///     },
-    ///     {
-    ///       "seatId": 2,
-    ///       "status": "OCCUPIED"
-    ///     }
-    ///   ]
-    /// }
-    /// ```
-    /// </remarks>
     [HttpGet("{eventId:int}/seats")]
     [ProducesResponseType(typeof(IEnumerable<GetSeatsResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -69,16 +44,25 @@ public class SeatAvailabilityController : ControllerBase
         [FromRoute] int eventId,
         CancellationToken cancellationToken)
     {
+        // Se declara una sola vez para todo el método
+        var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
+
         // Validación: eventId debe ser mayor a 0
         if (eventId <= 0)
         {
             _logger.LogWarning(
-                "Solicitud de asientos rechazada: eventId inválido. EventId={EventId}",
-                eventId);
-            return BadRequest(new { error = "EventId debe ser mayor a 0" });
+                "Solicitud de asientos rechazada: eventId inválido. EventId={EventId} | CorrelationId={CorrelationId}",
+                eventId,
+                correlationId);
+
+            var errorResponse = new ErrorResponse(
+                "INVALID_EVENT_ID",
+                "El ID del evento debe ser mayor a 0",
+                correlationId);
+
+            return BadRequest(errorResponse);
         }
 
-        var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
         _logger.LogInformation(
             "Consultando disponibilidad de asientos | EventId={EventId} | CorrelationId={CorrelationId}",
             eventId,
@@ -100,33 +84,43 @@ public class SeatAvailabilityController : ControllerBase
 
                 if (result.Error == AppError.NotFound)
                 {
-                    return NotFound(new { error = "Evento no encontrado" });
+                    var errorResponse = new ErrorResponse(
+                        "EVENT_NOT_FOUND",
+                        "El evento especificado no existe",
+                        correlationId);
+                    return NotFound(errorResponse);
                 }
 
                 if (result.Error == AppError.Unavailable)
                 {
-                    return StatusCode(
-                        StatusCodes.Status503ServiceUnavailable,
-                        new { error = "Servicio de reservas no disponible" });
+                    var errorResponse = new ErrorResponse(
+                        "SERVICE_UNAVAILABLE",
+                        "El servicio de reservas no está disponible",
+                        correlationId);
+                    return StatusCode(StatusCodes.Status503ServiceUnavailable, errorResponse);
                 }
 
-                return StatusCode(
-                    StatusCodes.Status500InternalServerError,
-                    new { error = "Error al procesar la solicitud" });
+                var internalErrorResponse = new ErrorResponse(
+                    "INTERNAL_ERROR",
+                    "Error al procesar la solicitud",
+                    correlationId);
+                return StatusCode(StatusCodes.Status500InternalServerError, internalErrorResponse);
             }
 
             var seatMap = result.Value;
 
-            // Validar que no sea nulo (aunque result.IsSuccess debería garantizarlo)
             if (seatMap == null)
             {
                 _logger.LogError(
                     "Resultado exitoso pero valor nulo | EventId={EventId} | CorrelationId={CorrelationId}",
                     eventId,
                     correlationId);
-                return StatusCode(
-                    StatusCodes.Status500InternalServerError,
-                    new { error = "Error al procesar la solicitud" });
+
+                var errorResponse = new ErrorResponse(
+                    "NULL_RESULT",
+                    "Resultado nulo inesperado",
+                    correlationId);
+                return StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
             }
 
             // Mapear SeatMapDto a GetSeatsResponse
@@ -153,7 +147,13 @@ public class SeatAvailabilityController : ControllerBase
                 "Solicitud cancelada | EventId={EventId} | CorrelationId={CorrelationId}",
                 eventId,
                 correlationId);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = "Solicitud expirada" });
+
+            var errorResponse = new ErrorResponse(
+                "REQUEST_TIMEOUT",
+                "La solicitud expiró",
+                correlationId);
+
+            return StatusCode(StatusCodes.Status408RequestTimeout, errorResponse);
         }
         catch (Exception ex)
         {
@@ -162,23 +162,18 @@ public class SeatAvailabilityController : ControllerBase
                 "Error no controlado al obtener asientos | EventId={EventId} | CorrelationId={CorrelationId}",
                 eventId,
                 correlationId);
-            return StatusCode(
-                StatusCodes.Status500InternalServerError,
-                new { error = "Error interno del servidor" });
+
+            var errorResponse = new ErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "Error interno del servidor",
+                correlationId);
+
+            return StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
         }
     }
 
-    /// <summary>
-    /// Extrae el ID del asiento (int) a partir del GUID interno.
-    /// 
-    /// Esta es una función temporal que invierte la conversión realizada en el UseCase.
-    /// En arquitecturas futuras, se utilizará un repositorio de mapeo bidireccional.
-    /// </summary>
-    /// <param name="seatGuid">GUID interno del asiento</param>
-    /// <returns>ID externo del asiento (int)</returns>
     private static int ExtractSeatIdFromGuid(Guid seatGuid)
     {
-        // Extrae los últimos 4 bytes del GUID como int (temporal para desarrollo)
         var bytes = seatGuid.ToByteArray();
         return BitConverter.ToInt32(bytes, 12);
     }
