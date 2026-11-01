@@ -404,3 +404,28 @@ vamos con la fase 2.3 del desarrollo. lee todo el plan de desarrollo de contexto
 	src/Availability/Availability.Api/Extensions/ClaimsPrincipalExtensions.cs
 	Herramientas para extraer información del JWT
 	Métodos: GetUserId(), GetEmail(), GetName(), GetRoles(), HasValidUserId(), HasRole(), GetClaimValue()
+
+
+## Prompt 9: Ejecución Fase 2
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.5 - Validación de componentes
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 2.5 del plan de desarrollo. leelo todo y despues aplica cambios. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado:
+	Documentación Práctica de Uso
+	**Archivo:** `src/Availability/Availability.Api/USAGE_GUIDE_CLAIMS_EXTENSIONS.md`
+
+	Se creó una guía completa que incluye:
+
+	- Explicación de cada método disponible en `ClaimsPrincipalExtensions`
+	- Ejemplos de uso práctico en controladores
+	- Patrón completo de uso en `ReservationsController`
+	- Consideraciones de seguridad y auditoría
+	- Best practices para integración con CorrelationIdMiddleware

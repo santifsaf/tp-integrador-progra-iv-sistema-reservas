@@ -1,4 +1,4 @@
-# Plan de Desarrollo: Availability.Api
+﻿# Plan de Desarrollo: Availability.Api
 **Proyecto:** Sistema distribuido de reserva de asientos para eventos (TP Programación 4 - TUP)  
 **Microservicio:** `Availability.Api` (Capa de Presentación / REST API)  
 **Arquitectura:** Clean Architecture + Dominio Anémico  
@@ -420,69 +420,22 @@ Se ha implementado la política de autorización completa para el microservicio 
 - Crear helper o extensión para obtener `sub` (subject/UserId) del token
 - Validar que el claim existe y no está vacío
 
-**Código de ejemplo:**
+    FASE 2.5 HA SIDO COMPLETADA EXITOSAMENTE ✅ ver USAGE_GUIDE_CLAIMS_EXTENSIONS.md
 
-```csharp
-// En un controlador o servicio
-public class ReservationsController : ControllerBase
-{
-	private readonly ILogger<ReservationsController> _logger;
-	private readonly ICreateReservationRequestUseCase _useCase;
+    ✓ La extensión ClaimsPrincipalExtensions está lista para usarse en Fase 3
+    ✓ Documentación práctica y ejemplos proporcionados
+    ✓ Proyecto compila sin errores
+    ✓ Integración con otros componentes validada
+    ✓ Plan actualizado
 
-	public ReservationsController(
-		ILogger<ReservationsController> logger,
-		ICreateReservationRequestUseCase useCase)
-	{
-		_logger = logger;
-		_useCase = useCase;
-	}
+    PRÓXIMO PASO: FASE 3 - IMPLEMENTACIÓN DE CONTROLADORES
 
-	[HttpPost]
-	[Authorize]
-	public async Task<IActionResult> CreateReservation([FromBody] CreateReservationRequest request)
-	{
-		// Extraer UserId del JWT
-		var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) 
-			?? User.FindFirst("sub");
+    En Fase 3 se crearán:
+      → SeatAvailabilityController (GET /api/events/{eventId}/seats)
+      → ReservationsController (POST /api/reservations, GET /api/reservations/{requestId})
 
-		if (userIdClaim == null)
-		{
-			_logger.LogWarning("UserId no encontrado en JWT claims");
-			return Unauthorized("UserId no válido");
-		}
-
-		var userId = userIdClaim.Value;
-		var correlationId = HttpContext.Items["CorrelationId"]?.ToString();
-
-		// Log de auditoría
-		_logger.LogInformation(
-			"Solicitud de reserva | CorrelationId: {CorrelationId} | UserId: {UserId} | EventId: {EventId} | SeatId: {SeatId}",
-			correlationId,
-			userId,
-			request.EventId,
-			request.SeatId
-		);
-
-		// Invocar caso de uso
-		var result = await _useCase.ExecuteAsync(userId, request.EventId, request.SeatId);
-
-		_logger.LogInformation(
-			"Respuesta 202 Accepted | CorrelationId: {CorrelationId} | RequestId: {RequestId}",
-			correlationId,
-			result.RequestId
-		);
-
-		return Accepted(new ReservationResponse
-		{
-			RequestId = result.RequestId,
-			Status = "RECEIVED",
-			Message = "Solicitud recibida correctamente"
-		});
-	}
-}
-```
-
-**Tiempo estimado:** 0.75 horas
+    Ambos usarán los métodos de ClaimsPrincipalExtensions exactamente como se muestra
+    en la documentación de Fase 2.5.
 
 ---
 
@@ -702,12 +655,12 @@ namespace Availability.Api.Middleware
 - [x] Crear clases DTO (Request, Response) ✅ **PASO 1.1**
 - [x] Configurar logging base en `Program.cs` (Serilog + Paquetes NuGet) ✅ **PASO 1.3 COMPLETADO**
 
-### Fase 2 ⏳ (EN PROGRESO)
+### Fase 2 ✅ (COMPLETADA)
 - [x] Agregar paquetes NuGet JWT Bearer ✅ **PASO 2.1 COMPLETADO**
 - [x] Configurar `appsettings.json` con JWT Settings ✅ **PASO 2.2 COMPLETADO**
 - [x] Implementar `AddJwtBearer()` en `Program.cs` ✅ **PASO 2.3 COMPLETADO**
-- [ ] Registrar middleware `UseAuthentication()` y `UseAuthorization()`
-- [ ] Implementar extracción de UserId desde claims JWT en controlador
+- [x] Registrar middleware `UseAuthentication()` y `UseAuthorization()`
+- [x] Documentar extracción de UserId desde claims JWT en controlador, ver USAGE_GUIDE_CLAIMS_EXTENSIONS.md
 
 ### Fase 3 ✅
 - [ ] Crear `SeatAvailabilityController` con endpoint `GET /api/events/{eventId}/seats`
