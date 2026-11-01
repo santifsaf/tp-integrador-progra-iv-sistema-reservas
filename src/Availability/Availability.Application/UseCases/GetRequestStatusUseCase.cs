@@ -5,7 +5,7 @@ using Availability.Domain.Enums;
 
 namespace Availability.Application.UseCases;
 
-public class GetRequestStatusUseCase
+public class GetRequestStatusUseCase : IGetReservationStatusUseCase
 {
     private const string Pending = "PENDING";
     private const string Failed = "FAILED";

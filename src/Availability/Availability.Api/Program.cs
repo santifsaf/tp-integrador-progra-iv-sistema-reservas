@@ -40,6 +40,8 @@ try
     // Registrar casos de uso y dependencias de aplicación
     builder.Services.AddScoped<GetSeatMapUseCase>();
     builder.Services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
+    builder.Services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
+    builder.Services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
 
     // Configurar autenticación JWT Bearer
     builder.Services

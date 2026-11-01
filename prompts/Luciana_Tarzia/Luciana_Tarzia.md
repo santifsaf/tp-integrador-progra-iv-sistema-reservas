@@ -444,3 +444,18 @@ vamos con la fase 2.3 del desarrollo. lee todo el plan de desarrollo de contexto
 
  ```
  ### Resultado Entregado: interfaz caso de uso + implementación + controlador REST.
+
+
+ ## Prompt 11: Ejecución Fase 3
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 3  
+**Objetivo:** Ejecutar Fase 3.2 - Crear controlador `ReservationsController`
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 3.2 del plan de desarrollo. leelo todo y despues aplica resumen de cambios hechos en el plan. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado: controlador para crear y consultar reservas + interfaces casos de uso

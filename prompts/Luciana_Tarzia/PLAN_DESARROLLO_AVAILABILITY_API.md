@@ -485,24 +485,45 @@ Se ha implementado la política de autorización completa para el microservicio 
 
 ---
 
-#### Paso 3.2: Crear controlador `ReservationsController`
-- **Endpoints:**
-  - `POST /api/reservations` - Crear solicitud (202 Accepted)
-  - `GET /api/reservations/{requestId}` - Consultar estado
+#### Paso 3.2: Crear controlador `ReservationsController` ✅ COMPLETADO
 
-- **Métodos:**
-  - `CreateReservation(CreateReservationRequest)` - Protegido con `[Authorize]`
-  - `GetReservationStatus(string requestId)` - Protegido con `[Authorize]`
+                                                                                                
+1. Interfaz para Crear Reservas
+•	 src/Availability/Availability.Application/Abstractions/ICreateReservationRequestUseCase.cs
+      Define el contrato para crear solicitudes de reserva
+      Recibe: userId, eventId, seatId (todos como Guid)
+      Retorna: RequestReceivedDto (ID + estado)
+                        
+2. Interfaz para Consultar Estado
+•	 src/Availability/Availability.Application/Abstractions/IGetReservationStatusUseCase.cs
+      Define el contrato para obtener el estado de una reserva
+      Recibe: requestId, userId (como Guid)
+      Retorna: RequestStatusDto (estado + datos)
+                      
+3. Controlador de Reservas
+•	 src/Availability/Availability.Api/Controllers/ReservationsController.cs
+       Endpoint POST: POST /api/reservations (202 Accepted)
+           Crea una nueva solicitud de reserva
+           Requiere autenticación JWT ([Authorize])
+           Validaciones completas
+           Logging con CorrelationId
+       Endpoint GET: GET /api/reservations/{requestId:guid} (200 OK)
+           Consulta el estado de una reserva existente
+           Requiere autenticación JWT
+           Validación de propiedad (solo el dueño puede ver)
+           Manejo de errores (403 Forbidden, 404 Not Found, etc)
 
-- **Validaciones en controlador:**
-  - DTO no nulo
-  - eventId > 0
-  - seatId > 0
-  - requestId no vacío
+Archivos Modificados
+1. Program.cs - Registro de dependencias
+          
+2. Casos de Uso Vinculados a Interfaces
+    CreateReservationRequestUseCase.cs ahora implementa ICreateReservationRequestUseCase
+    GetRequestStatusUseCase.cs ahora implementa IGetReservationStatusUseCase
 
-**Carpeta:** `Availability.Api/Controllers/ReservationsController.cs`
+✅ Compilación Exitosa: Build completado sin errores
+✅ Warnings: Solo 2 warnings de NuGet (no críticos)
+✅ Tiempo de Build: 25.4 segundos
 
-**Tiempo estimado:** 1 hora
 
 ---
 
@@ -689,7 +710,7 @@ namespace Availability.Api.Middleware
 
 ### Fase 3 ✅
 - [x] Crear `SeatAvailabilityController` con endpoint `GET /api/events/{eventId}/seats`
-- [ ] Crear `ReservationsController` con endpoints `POST /api/reservations` y `GET /api/reservations/{requestId}`
+- [x] Crear `ReservationsController` con endpoints `POST /api/reservations` y `GET /api/reservations/{requestId}`
 - [ ] Aplicar atributos `[ApiController]`, `[Route]`, `[Authorize]`
 - [ ] Validar `ModelState` en cada acción
 - [ ] Crear clase `ErrorResponse`
