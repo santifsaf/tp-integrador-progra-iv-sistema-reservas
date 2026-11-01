@@ -448,7 +448,7 @@ Se ha implementado la política de autorización completa para el microservicio 
 
 **Estimación:** 2.5 horas
 
-#### Paso 3.1: Crear controlador `SeatAvailabilityController`
+#### Paso 3.1: Crear controlador `SeatAvailabilityController` ✅ COMPLETADO
 - **Endpoint:** `GET /api/events/{eventId}/seats`
 - **Autenticación:** No requerida (público)
 - **Acción:** Delegar en `IGetSeatsAvailabilityUseCase`
@@ -456,7 +456,32 @@ Se ha implementado la política de autorización completa para el microservicio 
 
 **Carpeta:** `Availability.Api/Controllers/SeatAvailabilityController.cs`
 
-**Tiempo estimado:** 0.75 horas
+	IGetSeatsAvailabilityUseCase.cs - Interfaz del caso de uso
+	    Define el contrato para obtener disponibilidad de asientos
+        Recibe eventId como int (ID externo de la API)
+        Retorna Result<SeatMapDto> con el estado de los asientos
+	GetSeatsAvailabilityUseCase.cs - Implementación del caso de uso
+        Convierte el ID externo (int) a ID interno (Guid)
+    	Delega en GetSeatMapUseCase existente
+    	Maneja errores y disponibilidad de servicios
+	SeatAvailabilityController.cs - Controlador REST
+    	Endpoint: GET /api/events/{eventId}/seats
+    	Autenticación: No requerida (público)
+
+•	Validaciones:
+	eventId debe ser > 0
+	Manejo de errores (404, 503, 500)
+	Logging: Con CorrelationId incluido
+	Respuesta: Lista de GetSeatsResponse con SeatId, Status, EventId
+
+**Archivos Modificados:** 
+	Program.cs - Registro de dependencias
+	    Agregados using para Application.Abstractions y UseCases
+        Registrados servicios:
+	        GetSeatMapUseCase como Scoped
+    	    IGetSeatsAvailabilityUseCase como Scoped
+
+**Tiempo real:** 0.50 horas
 
 ---
 
@@ -663,7 +688,7 @@ namespace Availability.Api.Middleware
 - [x] Documentar extracción de UserId desde claims JWT en controlador, ver USAGE_GUIDE_CLAIMS_EXTENSIONS.md
 
 ### Fase 3 ✅
-- [ ] Crear `SeatAvailabilityController` con endpoint `GET /api/events/{eventId}/seats`
+- [x] Crear `SeatAvailabilityController` con endpoint `GET /api/events/{eventId}/seats`
 - [ ] Crear `ReservationsController` con endpoints `POST /api/reservations` y `GET /api/reservations/{requestId}`
 - [ ] Aplicar atributos `[ApiController]`, `[Route]`, `[Authorize]`
 - [ ] Validar `ModelState` en cada acción

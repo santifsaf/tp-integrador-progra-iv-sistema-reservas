@@ -1,4 +1,6 @@
 using Availability.Api.Middleware;
+using Availability.Application.Abstractions;
+using Availability.Application.UseCases;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -34,6 +36,10 @@ try
     var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 
     builder.Services.AddControllers();
+
+    // Registrar casos de uso y dependencias de aplicación
+    builder.Services.AddScoped<GetSeatMapUseCase>();
+    builder.Services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
 
     // Configurar autenticación JWT Bearer
     builder.Services
