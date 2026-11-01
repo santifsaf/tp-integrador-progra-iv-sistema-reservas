@@ -67,10 +67,20 @@ try
 
     var app = builder.Build();
 
+    // Orden crítico de middleware:
+    // 1. ExceptionHandlingMiddleware PRIMERO para capturar excepciones de TODO lo que viene después
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+    // 2. CorrelationIdMiddleware SEGUNDO para generar IDs de correlación antes de autenticación
     app.UseMiddleware<CorrelationIdMiddleware>();
+
+    // 3. Autenticación
     app.UseAuthentication();
+
+    // 4. Autorización
     app.UseAuthorization();
 
+    // Mapear controladores
     app.MapControllers();
     app.MapGet("/health", () => Results.Ok(new { service = "Availability", status = "ok" }));
 

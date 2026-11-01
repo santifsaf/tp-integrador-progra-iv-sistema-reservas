@@ -497,3 +497,18 @@ El plan habla de método `AddApplicationServices()` pero el código actual:
 
  ```
  ### Resultado Entregado: nuevo plan de desarrollo para fase 4. 
+
+
+## Prompt 14: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** Ejecutar Fase 4.3.1, 4.3.2 - Creación ExceptionHandlingMiddleware, registrar nuevo middleware en orden correcto
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 4.3.1 y 4.3.2 del plan de desarrollo. leelo todo y despues aplica resumen de cambios hechos en el plan. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado: El middleware está listo para capturar y manejar excepciones globales en la API
