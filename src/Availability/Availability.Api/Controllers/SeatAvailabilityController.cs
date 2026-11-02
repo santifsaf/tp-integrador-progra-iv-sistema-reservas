@@ -1,6 +1,7 @@
 using Availability.Api.DTOs.Responses;
 using Availability.Application.Abstractions;
 using Availability.Application.Common;
+using Availability.Application.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Availability.Api.Controllers;
@@ -25,22 +26,24 @@ public class SeatAvailabilityController : ControllerBase
     }
 
     /// <summary>
-    /// Obtiene la lista de asientos de un evento con su disponibilidad actual.
+    /// Obtiene el mapa de asientos disponibles para un evento específico.
+    /// Incluye información del evento, contador de asientos totales y disponibles,
+    /// así como la lista de asientos con su etiqueta (ej: "A1", "B2") y estado.
     /// </summary>
     /// <param name="eventId">Identificador del evento (int)</param>
     /// <param name="cancellationToken">Token de cancelación</param>
     /// <returns>
-    /// 200 OK: Listado de asientos con su estado de disponibilidad
+    /// 200 OK: Mapa de asientos con información del evento y estado de cada asiento
     /// 400 Bad Request: ID de evento inválido (debe ser mayor a 0)
     /// 404 Not Found: Evento no encontrado
     /// 503 Service Unavailable: Servicio de reservas no disponible
     /// </returns>
     [HttpGet("{eventId:int}/seats")]
-    [ProducesResponseType(typeof(IEnumerable<GetSeatsResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(SeatMapDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<IEnumerable<GetSeatsResponse>>> GetSeatsAvailability(
+    public async Task<ActionResult<SeatMapDto>> GetSeatsAvailability(
         [FromRoute] int eventId,
         CancellationToken cancellationToken)
     {
@@ -123,26 +126,13 @@ public class SeatAvailabilityController : ControllerBase
                 return StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
             }
 
-            // Mapear SeatMapDto a GetSeatsResponse
-            // NOTA: SeatId viene como Guid desde Application (lógica de mapeo temporal).
-            // ExtractSeatIdFromGuid es una conversión provisional. El equipo de Infrastructure
-            // debe resolver el mapeo Guid↔int en origen (en el repositorio/DTO).
-            var response = seatMap.Seats
-                .Select(seat => new GetSeatsResponse
-                {
-                    SeatId = ExtractSeatIdFromGuid(seat.SeatId),
-                    Status = seat.Status,
-                    EventId = eventId
-                })
-                .ToList();
-
             _logger.LogInformation(
                 "Asientos recuperados exitosamente | EventId={EventId} | Count={Count} | CorrelationId={CorrelationId}",
                 eventId,
-                response.Count,
+                seatMap.Seats.Count,
                 correlationId);
 
-            return Ok(response);
+            return Ok(seatMap);
         }
         catch (OperationCanceledException)
         {
@@ -174,16 +164,4 @@ public class SeatAvailabilityController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
         }
     }
-
-    /// <summary>
-    /// Converts internal GUID SeatId to external int.
-    /// This is a TEMPORARY implementation. The Infrastructure team should resolve
-    /// the mapping in the repository layer using GetByExternalIdAsync-like methods.
-    /// TODO: Remove after Infrastructure implements proper Guid↔int mapping.
-    /// </summary>
-    private static int ExtractSeatIdFromGuid(Guid seatGuid)
-    {
-        var bytes = seatGuid.ToByteArray();
-        return BitConverter.ToInt32(bytes, 12);
     }
-}
