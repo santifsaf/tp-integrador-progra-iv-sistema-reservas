@@ -527,3 +527,38 @@ El plan habla de método `AddApplicationServices()` pero el código actual:
 
  ```
  ### Resultado Entregado: refactors solucionados. Refactorizar inyección de dependencias (Patrón DependencyInjection), verificar mapeo de DateTime en GetReservationStatusResponse
+
+
+  ## Prompt 16: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** code review de solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+quiero que hagas un code review exhaustivo de la rama feat/availability-lu, teniendo como contexto los documentos que te adjunto: plan de desarrollo y 
+consigna del tp.
+
+ ```
+ ### Resultado Entregado: code review 
+
+
+   ## Prompt 17: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** code review de solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+yo solo me encargo de la capa api de availability. te paso mis tareas: Capa de presentación (API), validación del JWT del usuario y logs de auditoría (3f). 
+solo me importa que se cumpla eso. entonces lo que corresponde a mi desarrollo y lo que reportarste, deberia revisar 
+Problema 1: Conversión int ↔ Guid es MOCK/TEMPORAL (CRÍTICO) 
+Problema 2: GetSeatsAvailabilityUseCase TAMBIÉN hace mapeo temporal 
+Problema 3: Manejo incompleto de UpdatedAt en ReservationRequest quiero que me hagas un plan de desarrollo para esos cambios
+
+ ```
+ ### Resultado Entregado: code review 

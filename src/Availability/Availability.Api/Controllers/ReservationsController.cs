@@ -138,16 +138,14 @@ public class ReservationsController : ControllerBase
 
         try
         {
-            // Convertir int a Guid (temporalmente generamos un GUID a partir del int)
-            // En producción, esto vendría de un repositorio
-            var eventGuid = ConvertExternalEventIdToGuid(request.EventId);
-            var seatGuid = ConvertExternalSeatIdToGuid(request.SeatId);
+            // NOTA: EventId y SeatId se pasan como int (IDs externos del cliente).
+            // La conversión a Guid interno ocurre en la capa Application/Infrastructure
+            // mediante GetByExternalIdAsync() en el repositorio (responsabilidad del equipo de Infrastructure).
 
-            // Invocar el caso de uso
             var result = await _createReservationRequestUseCase.ExecuteAsync(
                 userId,
-                eventGuid,
-                seatGuid,
+                request.EventId,      // int - ID externo del evento
+                request.SeatId,       // int - ID externo del asiento
                 cancellationToken);
 
             // Manejar resultado fallido
@@ -416,12 +414,15 @@ public class ReservationsController : ControllerBase
             }
 
             // Mapear resultado a DTO de respuesta
+            // NOTA: Validar UpdatedAt para evitar valores default (DateTime(0))
             var response = new GetReservationStatusResponse
             {
                 RequestId = statusFromUseCase.RequestId.ToString("D"),
                 Status = statusFromUseCase.Status,
                 CreatedAt = statusFromUseCase.CreatedAt,
-                UpdatedAt = statusFromUseCase.UpdatedAt
+                UpdatedAt = statusFromUseCase.UpdatedAt > DateTime.MinValue 
+                    ? statusFromUseCase.UpdatedAt 
+                    : statusFromUseCase.CreatedAt  // Fallback a CreatedAt si UpdatedAt no está inicializado
             };
 
             _logger.LogInformation(
@@ -465,32 +466,4 @@ public class ReservationsController : ControllerBase
                 errorResponse);
         }
     }
-
-    /// <summary>
-    /// Convierten IDs externos (int) a GUIDs internos del dominio.
-    /// Esta es una implementación temporal. En producción, estos vendría de repositorios.
-    /// </summary>
-    private static Guid ConvertExternalEventIdToGuid(int eventId)
-    {
-        // Crea un GUID determinístico a partir del ID externo
-        // En producción, esto quedaría en un repositorio de mapeo
-        var bytes = new byte[16];
-        BitConverter.GetBytes(1).CopyTo(bytes, 0); // Namespace type
-        BitConverter.GetBytes(eventId).CopyTo(bytes, 12); // El ID especifico
-        return new Guid(bytes);
     }
-
-    /// <summary>
-    /// Convierte un SeatId externo (int) a un GUID interno.
-    /// Esta es una implementación temporal.
-    /// </summary>
-    private static Guid ConvertExternalSeatIdToGuid(int seatId)
-    {
-        // Crea un GUID determinístico a partir del ID externo
-        // En producción, esto quedaría en un repositorio de mapeo
-        var bytes = new byte[16];
-        BitConverter.GetBytes(2).CopyTo(bytes, 0); // Namespace type diferente
-        BitConverter.GetBytes(seatId).CopyTo(bytes, 12); // El ID específico
-        return new Guid(bytes);
-    }
-}

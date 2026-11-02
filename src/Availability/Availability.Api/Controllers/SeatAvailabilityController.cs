@@ -124,6 +124,9 @@ public class SeatAvailabilityController : ControllerBase
             }
 
             // Mapear SeatMapDto a GetSeatsResponse
+            // NOTA: SeatId viene como Guid desde Application (lógica de mapeo temporal).
+            // ExtractSeatIdFromGuid es una conversión provisional. El equipo de Infrastructure
+            // debe resolver el mapeo Guid↔int en origen (en el repositorio/DTO).
             var response = seatMap.Seats
                 .Select(seat => new GetSeatsResponse
                 {
@@ -172,6 +175,12 @@ public class SeatAvailabilityController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Converts internal GUID SeatId to external int.
+    /// This is a TEMPORARY implementation. The Infrastructure team should resolve
+    /// the mapping in the repository layer using GetByExternalIdAsync-like methods.
+    /// TODO: Remove after Infrastructure implements proper Guid↔int mapping.
+    /// </summary>
     private static int ExtractSeatIdFromGuid(Guid seatGuid)
     {
         var bytes = seatGuid.ToByteArray();

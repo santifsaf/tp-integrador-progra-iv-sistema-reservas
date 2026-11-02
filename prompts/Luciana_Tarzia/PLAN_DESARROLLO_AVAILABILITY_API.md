@@ -798,6 +798,69 @@ El middleware está listo para capturar y manejar excepciones globales en la API
 
 ---
 
+
+## Code review de solución ✅ COMPLETADO
+
+Estrategia 1: Remover lógica de conversión del controlador  
+    La conversión int → Guid NO es responsabilidad de la capa API. Debe delegarse al repositorio. Por ahora:
+    Remover métodos ConvertExternalEventIdToGuid() y ConvertExternalSeatIdToGuid() de ReservationsController
+    Remover método ExtractSeatIdFromGuid() de SeatAvailabilityController
+    Mantener parámetros int en DTOs (validación clara)
+    Pasar int directamente al UseCase y que EL UseCase valide mediante repositorio
+
+Estrategia 2: Refactorizar flujo de CreateReservation
+    El controlador debe:
+    Validar DTO (ya hace)
+    Extraer userId del JWT (ya hace)
+    Pasar int eventId, int seatId, Guid userId al UseCase
+    El UseCase (Application layer) debe recibir estos parámetros sin conversión
+    Documentar que Application/Infrastructure harán la conversión int → Guid
+
+Estrategia 3: Validar UpdatedAt en Responses
+    Antes de retornar GetReservationStatusResponse:
+    Validar que UpdatedAt sea válido (no DateTime(0))
+    Si viene de ReservationRequest, usar CreatedAt como fallback
+    Mapear correctamente en serialización DateTime
+
+Estrategia 4: Mejorar logs auditables
+    Agregar logs ANTES de inversión de control (invocación a UseCase) con parámetros reales para auditoría.
+
+
+Soluciones
+                                          
+1. ReservationsController — Eliminación de mapeo Mock (Problema 1 Parte API)
+    •	Archivo: src/Availability/Availability.Api/Controllers/ReservationsController.cs
+    •	Cambio:
+        •	Eliminadas las conversiones temporales ConvertExternalEventIdToGuid() y ConvertExternalSeatIdToGuid() del controlador
+        •	El método CreateReservation ahora pasa directamente int eventId e int seatId al caso de uso sin convertir
+        •	Agregado comentario explícito indicando que el mapeo int→Guid internos es responsabilidad de Application/Infrastructure
+    Por qué: La API no debe tener lógica de mapeo de IDs. Es trabajo de la capa Application resolver IDs externos a internos usando repositorios.
+
+2. ReservationsController — Manejo de UpdatedAt (Problema 3 Parte API) 
+    •	Archivo: src/Availability/Availability.Api/Controllers/ReservationsController.cs
+    •	Cambio:
+        •	En GetReservationStatus, agregado fallback: si UpdatedAt > DateTime.MinValue lo usa, sino usa CreatedAt como valor default
+        •	Esto evita que la API exponga DateTime.MinValue o valores inválidos
+    Por qué: Es tarea de presentación proteger contra datos inválidos de capas inferiores. El fallback es cuidado defensivo.
+
+              
+3. SeatAvailabilityController — Documentación de conversión temporal
+    •	Archivo: src/Availability/Availability.Api/Controllers/SeatAvailabilityController.cs
+    •	Cambio:
+        •	Agregado comentario detallado en el mapeo de respuesta indicando que ExtractSeatIdFromGuid() es provisorio
+        •	Descrito como TODO: será reemplazado por el equipo de Infrastructure
+        •	Mejorada la documentación XML del método privado ExtractSeatIdFromGuid
+    Por qué: Transparencia sobre qué es temporary/provisional y dónde corresponde la corrección.
+
+4. ICreateReservationRequestUseCase — Actualización de Contrato
+    •	Archivo: src/Availability/Availability.Application/Abstractions/ICreateReservationRequestUseCase.cs
+    •	Cambio:
+            •	Firma modificada de ExecuteAsync(Guid userId, Guid eventId, Guid seatId, ...) a ExecuteAsync(Guid userId, int eventId, int seatId, ...)
+            •	Documentación clara indicando que eventId/seatId son IDs externos y que Application/Infrastructure deben resolverlos
+    Importancia: Este cambio en el contrato permite que tu API pase IDs directamente sin conversión.
+
+
+
 ## Estructura Final de Archivos
 
 ```
