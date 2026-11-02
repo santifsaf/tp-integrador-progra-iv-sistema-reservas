@@ -512,3 +512,18 @@ El plan habla de método `AddApplicationServices()` pero el código actual:
 
  ```
  ### Resultado Entregado: El middleware está listo para capturar y manejar excepciones globales en la API
+
+
+ ## Prompt 15: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** Ejecutar Fase 4.3.3, 4.3.4 - inyección de dependencias por interfaz + campos de auditoría en RequestStatus
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 4.3.3 y 4.3.4 del plan de desarrollo. leelo todo y despues aplica resumen de cambios hechos en el plan. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado: refactors solucionados. Refactorizar inyección de dependencias (Patrón DependencyInjection), verificar mapeo de DateTime en GetReservationStatusResponse

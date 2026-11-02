@@ -1,6 +1,5 @@
 using Availability.Api.Middleware;
-using Availability.Application.Abstractions;
-using Availability.Application.UseCases;
+using Availability.Application;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -37,11 +36,8 @@ try
 
     builder.Services.AddControllers();
 
-    // Registrar casos de uso y dependencias de aplicación
-    builder.Services.AddScoped<GetSeatMapUseCase>();
-    builder.Services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
-    builder.Services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
-    builder.Services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
+    // Registrar dependencias de la capa de aplicación
+    builder.Services.AddApplication();
 
     // Configurar autenticación JWT Bearer
     builder.Services

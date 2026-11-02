@@ -420,8 +420,8 @@ public class ReservationsController : ControllerBase
             {
                 RequestId = statusFromUseCase.RequestId.ToString("D"),
                 Status = statusFromUseCase.Status,
-                CreatedAt = DateTime.UtcNow, // TODO: Obtener del useCase si se agrega a RequestStatusDto
-                UpdatedAt = DateTime.UtcNow  // TODO: Obtener del useCase si se agrega a RequestStatusDto
+                CreatedAt = statusFromUseCase.CreatedAt,
+                UpdatedAt = statusFromUseCase.UpdatedAt
             };
 
             _logger.LogInformation(

@@ -38,7 +38,7 @@ public class GetRequestStatusUseCase : IGetReservationStatusUseCase
         if (request.Status == RequestStatus.PublishFailed)
         {
             return Result<RequestStatusDto>.Success(
-                new RequestStatusDto(request.Id, Failed, PublishFailedDescription));
+                new RequestStatusDto(request.Id, Failed, PublishFailedDescription, request.CreatedAt, request.UpdatedAt));
         }
 
         BookingReservationStatusDto? bookingStatus;
@@ -53,10 +53,10 @@ public class GetRequestStatusUseCase : IGetReservationStatusUseCase
 
         if (bookingStatus is null)
         {
-            return Result<RequestStatusDto>.Success(new RequestStatusDto(request.Id, Pending, null));
+            return Result<RequestStatusDto>.Success(new RequestStatusDto(request.Id, Pending, null, request.CreatedAt, request.UpdatedAt));
         }
 
         return Result<RequestStatusDto>.Success(
-            new RequestStatusDto(request.Id, bookingStatus.Status.ToUpperInvariant(), bookingStatus.Description));
+            new RequestStatusDto(request.Id, bookingStatus.Status.ToUpperInvariant(), bookingStatus.Description, request.CreatedAt, request.UpdatedAt));
     }
 }

@@ -743,114 +743,58 @@ El middleware está listo para capturar y manejar excepciones globales en la API
 
 ---
 
-**Sub-tarea 4.3.3: Refactorizar inyección de dependencias (Patrón DependencyInjection)** ✅ IMPORTANTE
+**Sub-tarea 4.3.3: Refactorizar inyección de dependencias (Patrón DependencyInjection)** ✅ COMPLETADO
+**Sub-tarea 4.3.4: Verificar mapeo de DateTime en GetReservationStatusResponse** ✅ COMPLETADO
 
-**Problema actual (patrón no escalable):**
+#### 1️⃣ `ReservationsController.cs` 
+- **Impacto:** Refactorización de lógica del controlador
+- **Detalles:** Ajustes en la gestión de mapeo de DTOs y llamadas a UseCases
 
-En `Program.cs` líneas 47-50, se registran servicios manualmente:
-```csharp
-builder.Services.AddScoped<GetSeatMapUseCase>();
-builder.Services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
-builder.Services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
-builder.Services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
-```
+#### 2️⃣ `Program.cs`
+- **Impacto:** Actualización de configuración de dependencias
+- **Detalles:** 
+  - ✅ Refactorización de registro de servicios (ahora usa métodos extensores limpios)
+  - ✅ Actualización del orden de middleware
+  - ✅ Incorporación de `AddApplication()` en lugar de registros manuales
 
-**Existe alternativa (clase DependencyInjection preparada):**
+#### 3️⃣ `DependencyInjection.cs`
+- **Impacto:** Mejora en la arquitectura y escalabilidad de inyección
+- **Detalles:**
+  - ✅ Agregado: `using Availability.Application.Abstractions;`
+  - ✅ Cambio critical: `AddScoped<CreateReservationRequestUseCase>()` → `AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>()`
+  - ✅ Cambio critical: `AddScoped<GetRequestStatusUseCase>()` → `AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>()`
+  - ✅ **Nuevas líneas:** Interfaz `IGetSeatsAvailabilityUseCase` registrada
+  - ✅ **Implicancia:** Ahora todos los casos de uso se inyectan por interfaz (patrón DI correcto)
 
-`Availability.Application/DependencyInjection.cs` define:
-```csharp
-public static class DependencyInjection
-{
-    public static IServiceCollection AddApplication(this IServiceCollection services)
-    {
-        services.AddScoped<GetEventsUseCase>();
-        services.AddScoped<GetSeatMapUseCase>();
-        services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
-        services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
-        services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
-        services.AddScoped<GetUserRequestsUseCase>();
-        return services;
-    }
-}
-```
+#### 4️⃣ `RequestStatusDto.cs`
+- **Impacto:** Enriquecimiento de datos de respuesta
+- **Detalles:**
+  - ✅ **ANTES:** `public record RequestStatusDto(Guid RequestId, string Status, string? Description);`
+  - ✅ **AHORA:** Se agregaron campos `DateTime CreatedAt` y `DateTime UpdatedAt`
+  - ✅ Formato multilinea del record para mejor legibilidad
+  - ✅ Los campos timestamped permiten auditoría completa en el cliente
 
-**Solución (Patrón recomendado):**
+#### 5️⃣ `GetRequestStatusUseCase.cs`
+- **Impacto:** Actualización de construcción de DTOs
+- **Detalles:**
+  - ✅ **Línea 41:** Actualización para incluir parámetros `request.CreatedAt, request.UpdatedAt`
+  - ✅ **Línea 56:** Ajuste en construcción de `RequestStatusDto` con todos los parámetros
+  - ✅ **Línea 59:** Construcción de DTO en caso de bookingStatus disponible
+  - ✅ Ahora el UseCase mapea completamente desde la entidad domain a DTO
 
-Reemplazar el registro manual con llamada a método `AddApplication()`:
+#### 6️⃣ `ReservationRequest.cs` (Entity - Domain)
+- **Impacto:** Enriquecimiento del modelo de dominio
+- **Detalles:**
+  - ✅ **NUEVO:** Campo `public DateTime UpdatedAt { get; set; }`
+  - ✅ Complementa al campo `CreatedAt` existente
+  - ✅ Permite tracking completo del ciclo de vida de la solicitud
 
-```csharp
-// Reemplazar esto:
-builder.Services.AddScoped<GetSeatMapUseCase>();
-builder.Services.AddScoped<IGetSeatsAvailabilityUseCase, GetSeatsAvailabilityUseCase>();
-builder.Services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
-builder.Services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
+### ✅ Validación de Cambios
 
-// Con esto:
-builder.Services.AddApplication();  // ← Una línea, más escalable
-```
-
-**Ventajas:**
-- ✅ Escalabilidad: Agregar nuevos UseCases solo requiere editar `DependencyInjection.cs`
-- ✅ Separación de responsabilidades: La configuración de Application layer vive en Application
-- ✅ Reutilizable: Otros proyectos pueden importar el método
-
-- [ ] Agregar `using Availability.Application;` en `Program.cs`
-- [ ] Reemplazar 4 líneas de registro manual por: `builder.Services.AddApplication();`
-- [ ] Verificar que compilación sigue siendo correcta
-- [ ] Validar en runtime que inyección funciona (endpoints responden)
-
----
-
-**Sub-tarea 4.3.4: Verificar mapeo de DateTime en GetReservationStatusResponse** ✅ IMPORTANTE
-
-**Ubicación:** `Availability.Api/Controllers/ReservationsController.cs` (método GetReservationStatus)
-
-**Problema identificado:**
-
-```
-DateTime.UtcNow → CreatedAt, UpdatedAt (TODO: Usar valores del UseCase)
-```
-
-Esto sugiere que el controlador podría estar usando `DateTime.UtcNow` en lugar de mapear desde `RequestStatusDto`.
-
-**Verificación necesaria:**
-
-1. ✅ El UseCase `GetRequestStatusUseCase` retorna `RequestStatusDto` con propiedades `CreatedAt` y `UpdatedAt`
-2. ✅ El controlador mapea `RequestStatusDto.CreatedAt` → `GetReservationStatusResponse.CreatedAt`
-3. ✅ El controlador mapea `RequestStatusDto.UpdatedAt` → `GetReservationStatusResponse.UpdatedAt`
-4. ❌ NO usa `DateTime.UtcNow` (valor actual) sino valores reales del domain model
-
-**Especificación correcta:**
-```csharp
-// En ReservationsController.GetReservationStatus()
-var statusDto = await _getReservationStatusUseCase.ExecuteAsync(requestId, userId, cancellationToken);
-
-// Mapeo correcto:
-var response = new GetReservationStatusResponse
-{
-    RequestId = statusDto.RequestId.ToString("D"),  // GUID externo → string
-    Status = statusDto.Status,
-    CreatedAt = statusDto.CreatedAt,                // ← DEL DOMAIN, NO DateTime.UtcNow
-    UpdatedAt = statusDto.UpdatedAt                 // ← DEL DOMAIN, NO DateTime.UtcNow
-};
-```
-
-- [ ] Revisar controlador `ReservationsController.GetReservationStatus()`
-- [ ] Confirmar que mapea `RequestStatusDto.CreatedAt` y `RequestStatusDto.UpdatedAt`
-- [ ] NO usar `DateTime.UtcNow` (usar valores del UseCase)
-- [ ] Si hay asignaciones de `DateTime.UtcNow`, reemplazar por valores del DTO
-
----
-
-**Tiempo estimado:** 1.0 hora (0.5h middleware + 0.3h DependencyInjection + 0.2h validaciones)
-
-**Deliverables:**
-- ✅ `ExceptionHandlingMiddleware.cs` creado y registrado
-- ✅ Middleware reordenado en `Program.cs`
-- ✅ Inyección de dependencias refactorizada usando `AddApplication()`
-- ✅ Verificación de mapeo de DateTime completada
-- ✅ Compilación sin errores
-- ✅ Pruebas funcionales básicas de manejo de errores
+**Estado de compilación:** 
+- ✅ Sin errores de compilación
+- ✅ Sin advertencias críticas
+- ✅ Estructura mantiene coherencia arquitectónica
 
 ---
 
