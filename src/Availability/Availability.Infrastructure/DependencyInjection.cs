@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<ISeatRepository, SeatRepository>();
         services.AddScoped<IReservationPublisher, ServiceBusReservationPublisher>();
+        services.AddScoped<IBookingClient, BookingClient>();
         services.AddSingleton(TimeProvider.System);
 
         services.AddSingleton(serviceProvider =>

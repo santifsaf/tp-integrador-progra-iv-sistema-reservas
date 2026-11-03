@@ -171,15 +171,15 @@ Nombres propuestos para las implementaciones: `ReservationRequestRepository`, `E
 - `SaveAsync` inserta la solicitud y guarda los cambios en el mismo método. Solo persiste lo que recibe.
 - `UpdateStatusAsync` cambia el estado de una solicitud existente. Los estados posibles son `Received` (al guardar), `Published` y `PublishFailed` (después de intentar publicar en el broker).
 - `GetByIdAsync` devuelve `null` si no existe.
-- `GetByUserIdAsync` devuelve las solicitudes del usuario (orden propuesto: más recientes primero).
+- `GetByUserIdAsync` devuelve las solicitudes del usuario ordenadas por `CreatedAt` descendente y `Id` ascendente.
 
-**RF-4.** `EventRepository` y `SeatRepository` son de **solo lectura** y usan `AsNoTracking()`. El catálogo se carga con datos sembrados (seed) definidos por Availability.
+**RF-4.** `EventRepository` y `SeatRepository` son de **solo lectura** y usan `AsNoTracking()`. El catálogo se carga con datos sembrados (seed) definidos por Availability. `EventRepository.GetAllAsync` ordena eventos por `StartsAt` ascendente y `Id` ascendente.
 
 Cada evento persiste su precio en centavos (`PriceCents`) y su moneda (`Currency`) como parte del catálogo local.
 
 **RF-5.** `ISeatRepository.ExistsAsync` comprueba el **par** evento + asiento, no el `Id` del asiento por separado.
 
-**RF-6.** `GetByEventAsync` devuelve los asientos de un evento (orden propuesto: por `Label`).
+**RF-6.** `GetByEventAsync` devuelve los asientos de un evento ordenados por `Label` ascendente e `Id` ascendente.
 
 **RF-7.** Migración inicial generada y mantenida por una sola persona (Rebeca) para evitar conflictos.
 
@@ -212,7 +212,7 @@ Las fallas de Azure Service Bus y Booking se representan mediante `Availability.
 
 **RF-16.** `GetOccupiedSeatIdsAsync` deserializa la respuesta de Booking (`[{ "seatId", "isOccupied" }]`) y devuelve un conjunto con los `seatId` cuyo `isOccupied` es `true`. Una lista vacía (`200`) significa que no hay nada ocupado.
 
-**RF-17.** Cada llamada envía el header `X-Correlation-Id` con el `requestId` cuando corresponde (a confirmar con Santi).
+**RF-17.** Cada llamada a Booking envía `X-Correlation-ID`: usa `requestId` en el flujo de reserva y el ID recibido o generado por el middleware HTTP en consultas sin `requestId`.
 
 ### 7.4 Quién combina catálogo y ocupación
 
@@ -306,8 +306,7 @@ Existe un intervalo entre el `202 Accepted` de Availability y el procesamiento d
 
 **Con Santi (Booking, endpoints):**
 
-- Forma del JSON de `GET /api/reservations/by-request/{requestId}` y su correspondencia con `BookingReservationStatusDto(Status, Description)`, por ejemplo si `Description` sale del motivo de rechazo.
-- Qué devuelve si Booking todavía no procesó la solicitud (`404` o un estado `PENDING`).
+- **Resuelto (2026-11-03, verificado en la implementación compartida de Booking):** `GET /api/reservations/by-request/{requestId}` devuelve `{ status, description }`, donde `description` puede ser `null`; si Booking aún no tiene la reserva, responde `404` y Availability la interpreta como pendiente cuando la solicitud existe localmente.
 - Token esperado, URL de Booking en el compose y uso del header de correlación.
 
 **Con Felipe (Auth e infraestructura):**
@@ -328,7 +327,7 @@ Existe un intervalo entre el `202 Accepted` de Availability y el procesamiento d
 - [ ] El cliente de Booking obtiene un token, lo cachea y lo envía en cada llamada.
 - [ ] `GetOccupiedSeatIdsAsync` devuelve los `seatId` con `isOccupied` en `true` y un conjunto vacío cuando Booking responde `200` con lista vacía.
 - [ ] `GetStatusByRequestIdAsync` devuelve `null` ante `404`; ante un error de Booking lanza `ExternalServiceUnavailableException`.
-- [ ] Hay logs de inicio y fin (`Started`, `Completed`, `Failed`) por operación, con el `requestId`.
+- [ ] Hay logs estructurados con Serilog y los campos `Service`, `Operation`, `Event` (`Started`, `Completed`, `Failed`) y `CorrelationId`; incluyen duración, status HTTP y excepción cuando corresponda, sin registrar secretos ni payloads sensibles.
 - [ ] No hay secretos en el repositorio; existe un `.env.example`.
 - [ ] Hay pruebas de los repositorios, del publisher y del cliente HTTP (con un handler falso).
 - [ ] Las decisiones y patrones están comentados en el código y el historial de prompts está en `/prompts`.

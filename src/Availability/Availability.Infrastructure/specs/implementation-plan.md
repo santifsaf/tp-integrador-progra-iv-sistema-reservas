@@ -4,7 +4,7 @@
 **Proyecto:** TP Final — Sistema de reserva de asientos (grupo 5)
 **Basado en:** `technical-spec.md`, `business-rules.md` y `product-brief.md` (2026-10-31)
 **Responsable:** Rebeca — capa Infrastructure
-**Última actualización:** 2026-11-02
+**Última actualización:** 2026-11-03
 
 ## Cómo leer este plan
 
@@ -77,35 +77,33 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 | ID | Qué falta | Con quién | Tareas que destraba |
 |---|---|---|---|
 | **U-02** | **Resuelto:** vive en `/contracts/events/ReservationRequestedMessage.cs`, namespace `Booking.Business.Messages`; Infrastructure lo compila como archivo vinculado (BR-P-05). | Feli | T3.2 |
-| **U-03** | Qué hace `UpdateStatusAsync` si el `Id` no existe (BR-P-02). | Feli | T1.7 |
-| **U-04** | Orden de las listas (BR-P-11), incluido el de `GetAllAsync` de eventos, que no tiene definición. | Feli | T1.9 |
+| **U-03** | **Resuelto (2026-11-03, decisión de implementación):** `UpdateStatusAsync` lanza `KeyNotFoundException` si el `Id` no existe (BR-11). | Rebeca | T1.7 |
+| **U-04** | **Resuelto (2026-11-03, decisión de Rebeca conversada con Feli):** solicitudes por `CreatedAt` descendente; eventos por `StartsAt` ascendente; asientos por `Label` ascendente. En cada lista, `Id` ascendente desempata para mantener un orden estable (BR-42). | Rebeca / Feli | T1.9 |
 | **U-05** | **Resuelto:** el mensaje incluye `AmountCents` y `Currency`, no agrega `correlationId` al cuerpo y `RequestedAt` es `DateTimeOffset` (BR-P-06, BR-P-07). | Gian | T3.5, T3.6 |
-| **U-06** | **Resuelto (2026-11-02):** se verificó desde una aplicación de consola externa que la suscripción `booking` existe en el topic `grupo5-booking-topic`. | Gian / profesor | T3.1, T3.9 |
-| **U-07** | Forma del JSON de la consulta de estado y qué devuelve si Booking aún no procesó la solicitud (BR-P-08, BR-P-09). | Santi | T4.7 |
-| **U-08** | Header `X-Correlation-Id` en las llamadas a Booking (BR-P-10). | Santi | T4.8 |
-| **U-09** | PostgreSQL en el compose: servicio, versión, host y credenciales para la connection string; `depends_on` con healthcheck. | Felipe | T1.11, T2.4, T2.5 |
-| **U-10** | Dirección de Booking en el compose y nombre de la variable. | Felipe / Santi | T4.5, T4.10 |
-| **U-11** | Nombre de la variable de entorno del secreto del client `availability` en su contenedor. | Felipe | T4.4, T4.10 |
-| **U-12** | Token endpoint desde la red del compose y efecto sobre el emisor (`iss`), porque el compose fija `KC_HOSTNAME` en `http://localhost:8081`. | Felipe | T4.3, T4.10 |
-| **U-13** | Convención de logs más allá del `correlationId`: formato, proveedor y campos. | Felipe | T5.5 |
-| **U-14** | Qué correlación usar en consultas sin `requestId` (listado de asientos y ocupación), o si se dejan fuera de la auditoría de cadenas. | Felipe / Feli / Luciana | T5.6 |
-| **U-15** | Proyecto Api con el paquete `Microsoft.EntityFrameworkCore.Design` y un `Program.cs` que llame a `AddInfrastructure` y `ApplyMigrationsAsync`. | Luciana | T1.10, T2.3, T2.5 |
+| **U-06** | **Resuelto (2026-11-02):** se verificó desde una aplicación de consola externa que la suscripción `booking` existe en el topic `grupo5-booking-topic`. 
+| **U-07** | **Resuelto (2026-11-03, verificado en la implementación compartida de Booking):** `200` devuelve `{ "status", "description" }`; `404` significa que Booking todavía no tiene una reserva para el `requestId`. Availability interpreta ese `404` como pendiente si la solicitud existe localmente. | Booking API | T4.7 |
+| **U-08** | **Resuelto (2026-11-03):** estandarizar el header saliente como `X-Correlation-ID`. Las consultas de reserva usan `requestId`; otras consultas propagan el ID HTTP. | Santi / Rebeca | T4.8 |
+| **U-09** | **Acordado e implementado parcialmente (2026-11-03):** PostgreSQL 16 como `availability-db`, puerto host `5433` → contenedor `5432`, variables `AVAILABILITY_DB_NAME`, `AVAILABILITY_DB_USER`, `AVAILABILITY_DB_PASSWORD` y healthcheck `pg_isready`. La API no está en el compose, por lo que su `depends_on: condition: service_healthy` sigue pendiente de integración. | Felipe / Rebeca | T1.11, T2.4, T2.5 |
+| **U-10** | `Booking__BaseUrl=http://booking:8080/` en Docker y `http://localhost:5200/` en ejecución local. Falta cablearla en la configuración de la API, que mantiene Luciana. | Felipe / Santi | T4.5, T4.10 |
+| **U-11** | **Convención ** la API leerá `Keycloak__ClientSecret`, con valor `${AVAILABILITY_CLIENT_SECRET}` en Compose. Falta agregar ese mapeo cuando se incorpore el servicio de la API, responsabilidad de Luciana/Felipe. | Felipe | T4.4, T4.10 |
+| **U-12** | **Decisión confirmada (2026-11-03):** dentro de Compose, el token endpoint es `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; el `iss` permanece `http://localhost:8081/realms/seat-reservation`. Falta aplicar la configuración en la API. | Felipe | T4.3, T4.10 |
+| **U-13** | **Convención acordada (2026-11-03):** mantener Serilog y usar logs estructurados con `Service`, `Operation`, `Event`, `CorrelationId`; agregar duración, status HTTP y excepción cuando corresponda, sin registrar secretos ni payloads sensibles. La configuración de Serilog y el middleware de API requieren integración de Luciana; Infrastructure ya registra algunos eventos estructurados. | Felipe / Rebeca | T5.5, T5.7 |
+| **U-14** | **Decisión confirmada (2026-11-03):** usar `requestId` en operaciones de reserva y el ID del middleware HTTP en consultas sin `requestId`; propagarlo a Booking como `X-Correlation-ID`. El cliente de Infrastructure fija `requestId` en la consulta de estado y el handler propaga el ID HTTP para otras consultas. | Felipe / Feli / Luciana | T5.6 |
+| **U-15** | Proyecto Api con el paquete `Microsoft.EntityFrameworkCore.Design` y un `Program.cs` que llame a `AddInfrastructure` y `ApplyMigrationsAsync`; coordinar además la configuración y el servicio API en Compose con Felipe. | Luciana / Felipe | T1.10, T2.3, T2.5, integración de U-09/U-11 |
 | **U-16** | Framework de pruebas y estrategia para los repositorios (PostgreSQL real o base en memoria). | Grupo | T6.1 y todas las pruebas de F6 |
 | **U-17** | Valores de timeouts y reintentos del cliente HTTP y del publisher. | Grupo | T5.1, T5.3, T5.4 |
 | **U-18** | Si el publisher usa los reintentos del SDK de Service Bus o Polly. | Grupo | T5.2, T5.4 |
 | **U-19** | Ubicación y formato del historial de prompts (el reparto indica `/prompts` con `Nombre_Apellido.md` y la guía `prompts/Nombre_Apellido/`) y de la carpeta de decisiones. | Grupo / Felipe | T7.2, T7.3 |
 | **U-20** | Quién del subgrupo arma el diagrama de Availability, la marca de consistencia eventual y la tabla de interpretación. | Subgrupo | T7.4 |
-| **U-21** | Verificar que `feat/availability` existe y que Domain y Application tienen las entidades e interfaces acordadas con Feli. | Rebeca / Feli | T0.1 |
+| **U-21** | **Resuelto (2026-11-03):** se verificó que `feat/availability` existe y que Domain y Application tienen las entidades e interfaces acordadas con Feli. | Rebeca / Feli | T0.1 |
 
 ### Qué conviene cerrar primero
 
 Ordenados por cuántas tareas destraban:
 
-1. **U-09 a U-13 (Felipe):** se pueden preguntar en una sola conversación y destraban PostgreSQL, Keycloak y Booking en el compose.
-2. **U-15 (Luciana):** destraba la migración inicial y el arranque.
-3. **U-03 y U-04 (Feli):** definen el caso de solicitud inexistente y el orden de las listas. U-02, U-05 y U-06 ya están resueltos.
-4. **U-07 y U-08 (Santi).**
-5. **U-16, U-17 y U-18 (Grupo)** pueden esperar a las fases finales.
+1. **U-15 (Luciana):** destraba la migración inicial y el arranque.
+2. **U-17/U-18 (grupo):** definir timeouts y reintentos del cliente HTTP y del publisher.
+3. **U-16, U-17 y U-18 (Grupo)** pueden esperar a las fases finales.
 
 ---
 
@@ -121,7 +119,7 @@ Ordenados por cuántas tareas destraban:
 | **T0.3** | Crear la estructura de carpetas de la spec §3 y las referencias a Application y Domain. | T0.2 | Lista (tras T0.1) | — |
 | **T0.4** | Agregar los paquetes de la spec §3 (provider de Npgsql, `Azure.Messaging.ServiceBus`, `Microsoft.Extensions.Http.Resilience`), fijando la última versión estable compatible con .NET 10. | T0.3 | Lista (tras T0.1) | — |
 | **T0.5** | Crear las clases de opciones `ServiceBusOptions`, `BookingClientOptions` y `KeycloakOptions`. | T0.3 | Lista (tras T0.1) | — |
-| **T0.6** | Armar la lista de claves de configuración de Availability (spec §4) para pasársela a Felipe, que mantiene el compose. Los valores de Booking y del secreto de Keycloak se completan cuando se resuelvan U-10 y U-11. | T0.5 | Lista | — |
+| **T0.6** | Armar la lista de claves de configuración de Availability (spec §4) para pasársela a Felipe, que mantiene el compose. Las direcciones de Booking y Keycloak y el nombre del secreto ya están definidos; los valores sensibles se mantienen en `.env`. | T0.5 | Lista | — |
 
 **Se considera terminada cuando:** la solución compila y la estructura coincide con la spec §3.
 **PR 0:** `feat(availability): estructura de la capa Infrastructure`.
@@ -139,13 +137,13 @@ Ordenados por cuántas tareas destraban:
 | **T1.2** | `AvailabilityDbContext` con `ApplyConfigurationsFromAssembly`. | F0 | Lista | — |
 | **T1.3** | Configuraciones de `ReservationRequest`, `Event` y `Seat`: claves, `ValueGeneratedNever`, conversión de `Status` a texto, índices por `UserId` y `EventId`, clave foránea, y persistencia de `Event.PriceCents` y `Event.Currency`. | T1.2 | Lista | — |
 | **T1.4** | Seed con `HasData`. | T1.1, T1.3 | Lista (tras T1.1) | — |
-| **T1.5** | `ReservationRequestRepository`: `SaveAsync`, `GetByIdAsync` (devuelve `null` si no existe) y `GetByUserIdAsync`, sin orden definido. | T1.3 | Lista | — |
+| **T1.5** | `ReservationRequestRepository`: `SaveAsync`, `GetByIdAsync` (devuelve `null` si no existe) y `GetByUserIdAsync` ordenado por `CreatedAt` descendente y `Id` ascendente. | T1.3 | Lista | — |
 | **T1.6** | `UpdateStatusAsync`: cambia únicamente el estado de una solicitud existente. | T1.5 | Lista | — |
-| **T1.7** | `UpdateStatusAsync`: comportamiento si la solicitud no existe. | T1.6, U-03 | **Bloqueada (U-03)** | Lanzar `KeyNotFoundException` (spec §5.3) |
-| **T1.8** | `EventRepository` (`GetAllAsync`, `GetByIdAsync`) y `SeatRepository` (`GetByEventAsync`, `ExistsAsync` sobre el par evento + asiento), de solo lectura con `AsNoTracking`, sin orden definido. | T1.3 | Lista | — |
-| **T1.9** | Aplicar el orden de las listas. | T1.5, T1.8, U-04 | **Bloqueada (U-04)** | Solicitudes de más reciente a más antigua; asientos por `Label`; eventos por `StartsAt` (este último es una propuesta mía: no está definido) |
+| **T1.7** | `UpdateStatusAsync`: lanza `KeyNotFoundException` si la solicitud no existe. | T1.6, U-03 | **Implementada (2026-11-03)** | — |
+| **T1.8** | `EventRepository.GetAllAsync` ordenado por `StartsAt` ascendente e `Id` ascendente; `SeatRepository.GetByEventAsync` ordenado por `Label` e `Id` ascendentes; ambos de solo lectura con `AsNoTracking`. `ExistsAsync` verifica el par evento + asiento. | T1.3 | Lista | — |
+| **T1.9** | Aplicar el orden definido para solicitudes, eventos y asientos, con `Id` ascendente como desempate estable. | T1.5, T1.8, U-04 | **Implementada (2026-11-03)** | — |
 | **T1.10** | Generar la migración inicial `InitialCreate` con `dotnet ef`, usando el Api como proyecto de inicio. | T1.4, T1.8, U-15 | **Bloqueada (U-15)** | `IDesignTimeDbContextFactory` en Infrastructure para generarla sin depender del Api |
-| **T1.11** | Verificar contra un PostgreSQL real que se crean las tres tablas y se carga el seed. | T1.10, U-09 | **Bloqueada (U-09)** | Un PostgreSQL local temporal, solo si lo autorizás |
+| **T1.11** | Verificar contra el PostgreSQL del compose que se crean las tres tablas y se carga el seed. | T1.10, U-09 | **Bloqueada (T1.10 / U-15)** | — |
 | **T1.12** | Comentar en el código las decisiones y patrones (Repository, Fluent API, `AsNoTracking`, `ValueGeneratedNever`, UTC). | T1.5, T1.8 | Lista | — |
 
 **Se considera terminada cuando:** el código compila y los repositorios cumplen BR-01, BR-03, BR-06 a BR-14. La migración y su verificación (T1.10 y T1.11) cierran los criterios de aceptación de tablas y seed.
@@ -162,9 +160,9 @@ Ordenados por cuántas tareas destraban:
 |---|---|---|---|---|
 | **T2.1** | `DatabaseInitializer.ApplyMigrationsAsync` (equivalente asíncrono de `Database.Migrate()`). | F1 | Lista (tras F1) | — |
 | **T2.2** | `AddInfrastructure(IServiceCollection, IConfiguration)`: opciones, `DbContext` con `ConnectionStrings:AvailabilityDb`, repositorios y `TimeProvider`. Los registros del publisher, el token y el cliente de Booking se suman en F3 y F4. | F1 | Lista (tras F1) | — |
-| **T2.3** | Coordinar con Luciana que `Program.cs` llame a `AddInfrastructure(builder.Configuration)` y a `ApplyMigrationsAsync()`. | T2.1, T2.2, U-15 | **Bloqueada (U-15)** | — |
-| **T2.4** | Que Availability espere a que PostgreSQL esté listo: `depends_on` con healthcheck en el compose y reintentos de conexión en Npgsql. | U-09 | **Bloqueada (U-09)** | `EnableRetryOnFailure()` en las opciones de Npgsql (propuesta técnica de la spec §5.4) |
-| **T2.5** | Verificar que la app migra y siembra la base al iniciar con `docker-compose up`. | T2.3, T2.4, U-09, U-15 | **Bloqueada (U-09, U-15)** | — |
+| **T2.3** | Coordinar con Luciana que `Program.cs` llame a `AddInfrastructure(builder.Configuration)` y a `ApplyMigrationsAsync()`, y que Api.csproj incluya `Microsoft.EntityFrameworkCore.Design`. | T2.1, T2.2, U-15 | **Bloqueada (U-15; responsabilidad de Luciana)** | — |
+| **T2.4** | Que Availability espere a que PostgreSQL esté listo: `depends_on` con `service_healthy` en el compose y reintentos de conexión en Npgsql. | U-09 | **Bloqueada (falta integrar la API al compose)** | `EnableRetryOnFailure()` en las opciones de Npgsql (propuesta técnica de la spec §5.4) |
+| **T2.5** | Verificar que la app migra y siembra la base al iniciar con `docker-compose up`. | T2.3, T2.4, U-09, U-15 | **Bloqueada (integración de Luciana y T2.4)** | — |
 
 **Se considera terminada cuando:** al iniciar la app con el compose, la base queda migrada y sembrada sin pasos manuales.
 **PR 2:** `feat(availability): inicialización de la base y DI`.
@@ -201,16 +199,16 @@ Ordenados por cuántas tareas destraban:
 
 | ID | Tarea | Depende de | Estado | Provisorio posible |
 |---|---|---|---|---|
-| **T4.1** | `KeycloakTokenProvider`: `client_credentials`, caché del token y renovación 30 segundos antes del vencimiento, con un semáforo para no pedir varios tokens a la vez. | F0 | Lista | — |
-| **T4.2** | `BookingAuthHandler`: agrega `Authorization: Bearer` en cada llamada. | T4.1 | Lista (tras T4.1) | — |
-| **T4.3** | Definir el token endpoint que se usa dentro de la red del compose. | U-12 | **Bloqueada (U-12)** | `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token` (propuesta de la spec §4, sin verificar) |
-| **T4.4** | Fijar el nombre de la variable del secreto del client `availability` en el contenedor de Availability. | U-11 | **Bloqueada (U-11)** | — |
-| **T4.5** | Fijar `Booking:BaseUrl`. | U-10 | **Bloqueada (U-10)** | — |
-| **T4.6** | `BookingClient.GetOccupiedSeatIdsAsync`: `GET api/events/{eventId}/occupied-seats`, deserializa `[{ seatId, isOccupied }]` y devuelve los `seatId` con `isOccupied` en `true`; lista vacía con `200` significa "nada ocupado". Si Booking falla, lanza `ExternalServiceUnavailableException`. | T4.2 | **Lista (tras T4.2)** | — |
-| **T4.7** | `BookingClient.GetStatusByRequestIdAsync`: `GET api/reservations/by-request/{requestId}`, `null` ante `404`, `ExternalServiceUnavailableException` ante otros errores. | T4.6, U-07 | **Bloqueada (U-07)** | Deserializar a `BookingReservationStatusDto(Status, Description)` con nombres camelCase (spec §7.2, sin confirmar) |
-| **T4.8** | Enviar el header `X-Correlation-Id` con el `requestId`. | T4.7, U-08 | **Bloqueada (U-08)** | — |
-| **T4.9** | Registrar en `AddInfrastructure` el `KeycloakTokenProvider` (singleton), el handler y el `HttpClient` tipado de `BookingClient`, sin resiliencia todavía. | T4.2, T4.6 | Lista (tras T4.6) | — |
-| **T4.10** | Verificar contra Keycloak y Booking reales: el token se pide una sola vez mientras es válido y las dos consultas responden. | T4.3, T4.4, T4.5, T4.7, U-10, U-11, U-12 | **Bloqueada (U-10, U-11, U-12)** | — |
+| **T4.1** | `KeycloakTokenProvider`: `client_credentials`, caché del token y renovación 30 segundos antes del vencimiento, con un semáforo para no pedir varios tokens a la vez. | F0 | **Implementada** | — |
+| **T4.2** | `BookingAuthHandler`: agrega `Authorization: Bearer` en cada llamada. | T4.1 | **Implementada** | — |
+| **T4.3** | Configurar el token endpoint de Keycloak para Docker y desarrollo local, validando el issuer acordado. | U-12 | **Decisión resuelta; configuración de API pendiente con Luciana** | Docker: `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; local: `http://localhost:8081/realms/seat-reservation/protocol/openid-connect/token` |
+| **T4.4** | Fijar el nombre de la variable del secreto del client `availability` en el contenedor de Availability. | U-11 | **Convención resuelta; falta cablear al agregar la API al compose** | `Keycloak__ClientSecret: ${AVAILABILITY_CLIENT_SECRET}` |
+| **T4.5** | Fijar `Booking:BaseUrl`. | U-10 | **Decisión resuelta; configuración de API pendiente con Luciana** | Docker: `http://booking:8080/`; local: `http://localhost:5200/` |
+| **T4.6** | `BookingClient.GetOccupiedSeatIdsAsync`: `GET api/events/{eventId}/occupied-seats`, deserializa `[{ seatId, isOccupied }]` y devuelve los `seatId` con `isOccupied` en `true`; lista vacía con `200` significa "nada ocupado". Si Booking falla, lanza `ExternalServiceUnavailableException`. | T4.2 | **Implementada (2026-11-03)** | — |
+| **T4.7** | `BookingClient.GetStatusByRequestIdAsync`: `GET api/reservations/by-request/{requestId}`, deserializa `{ status, description }`, devuelve `null` ante `404` (solicitud todavía no disponible en Booking) y lanza `ExternalServiceUnavailableException` ante otros errores o respuestas inválidas. | T4.6, U-07 | **Implementada (2026-11-03)** | — |
+| **T4.8** | Enviar `X-Correlation-ID`: `requestId` en consultas de reserva y el ID HTTP en las consultas sin `requestId`. | T4.7, U-08 | **Implementada (2026-11-03):** el cliente fija el `requestId` para la consulta de estado y el handler propaga el ID HTTP para otras consultas | — |
+| **T4.9** | Registrar en `AddInfrastructure` el `KeycloakTokenProvider`, los handlers y el cliente HTTP de Booking. | T4.2, T4.6 | **Implementada (2026-11-03)** | — |
+| **T4.10** | Verificar contra Keycloak y Booking reales: el token se pide una sola vez mientras es válido y las dos consultas responden. | T4.3, T4.4, T4.5, T4.7 | **Pendiente de integrar y configurar la API en Compose (Luciana/Felipe) y de disponer de los servicios reales** | — |
 | **T4.11** | Comentar las decisiones: caché del token, handler delegante, `404` como `null`, errores que se distinguen. | T4.7 | Lista (tras T4.7) | — |
 
 **Se considera terminada cuando:** el cliente obtiene un token del client `availability`, lo cachea y consulta los dos endpoints de Booking (BR-22 a BR-30).
@@ -229,9 +227,9 @@ Ordenados por cuántas tareas destraban:
 | **T5.2** | Confirmar si el publisher usa los reintentos del SDK o Polly. | U-18 | **Bloqueada (U-18)** | `ServiceBusRetryOptions` del SDK, sin Polly, para no multiplicar los reintentos (spec §8.2) |
 | **T5.3** | Agregar `AddStandardResilienceHandler()` al `BookingClient` y al `HttpClient` de Keycloak, **registrado antes** del handler de token para que cada reintento use el token vigente. | F4, T5.1 | **Bloqueada (U-17)** | Valores por defecto |
 | **T5.4** | Configurar `ServiceBusRetryOptions` en el `ServiceBusClient`. | F3, T5.1, T5.2 | **Bloqueada (U-17, U-18)** | Valores por defecto del SDK |
-| **T5.5** | Aplicar la convención de logs de Felipe (formato, proveedor, campos). | U-13 | **Bloqueada (U-13)** | Seguir con `ILogger<T>` sin formato propio |
-| **T5.6** | Definir la correlación de las consultas sin `requestId` (listado de asientos y ocupación). | U-14 | **Bloqueada (U-14)** | Ninguna: queda sin correlación de cadena hasta que se decida |
-| **T5.7** | Logs `Started`, `Completed` y `Failed` con un scope `CorrelationId` igual al `requestId` en el publisher, en la consulta de estado de `BookingClient` y en `ReservationRequestRepository`. Usa `ILogger<T>` (propuesta de la spec §9). Nunca se registran secretos, tokens ni la connection string. | F1, F3, F4 | Lista (tras F1, F3 y F4) | — |
+| **T5.5** | Aplicar la convención de logs acordada: Serilog estructurado con `Service`, `Operation`, `Event`, `CorrelationId`, duración, status HTTP y excepción según corresponda. | U-13 | **Parcial: publisher y repositorio emiten eventos estructurados; falta configurar salida/campos y middleware en API (Luciana)** | — |
+| **T5.6** | Propagar la correlación HTTP de consultas sin `requestId` a Booking con `X-Correlation-ID`; las consultas de reserva usan `requestId`. | U-14 | **Implementada en Infrastructure; requiere el middleware HTTP de API para consultas sin `requestId`** | — |
+| **T5.7** | Logs `Started`, `Completed` y `Failed` correlacionados en las operaciones de Infrastructure y en el pipeline HTTP; nunca registrar secretos, tokens ni connection strings. | F1, F3, F4 | Parcialmente implementada; faltan los logs del cliente Booking y el pipeline HTTP de API (Luciana) | — |
 
 **Se considera terminada cuando:** hay reintentos y timeouts configurados en los dos clientes, y los logs de auditoría permiten seguir un `requestId` por Availability (BR-41).
 **Nota:** como los reintentos pueden duplicar un mensaje, la protección es el `MessageId` igual al `requestId` y la idempotencia de Booking por `requestId`.
@@ -253,13 +251,13 @@ Pruebas a escribir una vez resuelta T6.1:
 | ID | Prueba | Regla | Depende de | Estado |
 |---|---|---|---|---|
 | **T6.2** | `SaveAsync` con `Id` repetido falla | BR-08 | T6.1, F1 | **Bloqueada (U-16)** |
-| **T6.3** | `UpdateStatusAsync` cambia el estado; los tres valores del enum se guardan y se leen | BR-10, BR-11 | T6.1, F1 | **Bloqueada (U-16)** |
+| **T6.3** | `UpdateStatusAsync` cambia el estado, lanza `KeyNotFoundException` si el Id no existe y los tres valores del enum se guardan y se leen | BR-10, BR-11 | T6.1, F1 | **Bloqueada (U-16)** |
 | **T6.4** | `ExistsAsync` es `false` si el asiento no pertenece al evento | BR-01 | T6.1, F1 | **Bloqueada (U-16)** |
-| **T6.5** | `GetByUserIdAsync` devuelve solo las solicitudes del usuario | BR-14 | T6.1, F1 | **Bloqueada (U-16)** |
+| **T6.5** | `GetByUserIdAsync` devuelve solo las solicitudes del usuario en orden de `CreatedAt` descendente y `Id` ascendente | BR-14, BR-42 | T6.1, F1 | **Bloqueada (U-16)** |
 | **T6.6** | El seed carga al menos un evento con asientos y es reproducible | BR-04 | T6.1, F1 | **Bloqueada (U-16)** |
 | **T6.7** | El publisher envía el JSON acordado con `MessageId` y `CorrelationId` iguales al `requestId` | BR-17, BR-19 | T6.1, F3 | **Bloqueada (U-16)** |
 | **T6.8** | El cliente devuelve los `seatId` con `isOccupied` en `true`, y vacío si Booking responde `200` con lista vacía (con un `HttpMessageHandler` falso) | BR-25, BR-26 | T6.1, F4 | **Bloqueada (U-16)** |
-| **T6.9** | `GetStatusByRequestIdAsync` devuelve `null` con `404` y lanza excepción ante un error | BR-27, BR-28 | T6.1, F4 | **Bloqueada (U-16, U-07)** |
+| **T6.9** | `GetStatusByRequestIdAsync` devuelve `null` con `404` y lanza excepción ante un error | BR-27, BR-28 | T6.1, F4 | **Bloqueada (U-16)** |
 | **T6.10** | El token se pide una sola vez mientras es válido y se envía en cada llamada | BR-29, BR-30 | T6.1, F4 | **Bloqueada (U-16)** |
 
 **Se considera terminada cuando:** todas las pruebas pasan y cubren los criterios de aceptación del brief.
@@ -291,12 +289,14 @@ Pruebas a escribir una vez resuelta T6.1:
 | Fase | Tareas | Listas | Bloqueadas | Pendientes de autorización |
 |---|---|---|---|---|
 | F0 | 6 | 6 | 0 | 0 |
-| F1 | 12 | 8 | 4 | 0 |
+| F1 | 12 | 10 | 2 | 0 |
 | F2 | 5 | 2 | 3 | 0 |
 | F3 | 10 | 9 | 0 | 1 |
-| F4 | 11 | 4 | 7 | 0 |
-| F5 | 7 | 1 | 6 | 0 |
+| F4 | 11 | 8 | 3 | 0 |
+| F5 | 7 | 3 | 4 | 0 |
 | F6 | 10 | 0 | 10 | 0 |
 | F7 | 6 | 3 | 3 | 0 |
 
-**Por dónde arrancar ya mismo, sin esperar a nadie:** T0.1 a T0.6, y después T1.1 a T1.6, T1.8 y T1.12 en paralelo con T3.3, T3.7, T4.1 y T4.2.
+**Desbloqueos recientes:** U-03 permitió completar T1.7 y U-04 permitió completar T1.9. U-08 a U-14 tienen decisiones confirmadas. De U-09 solo está implementado el contenedor de base; la API aún no está en Compose, por lo que siguen pendientes `depends_on` y el mapeo del secreto U-11. Las direcciones acordadas para U-10/U-12 tampoco están configuradas en la API. La revisión confirmó que [Availability.Api.csproj](../../Availability.Api/Availability.Api.csproj) aún no referencia `Microsoft.EntityFrameworkCore.Design` y [Program.cs](../../Availability.Api/Program.cs) todavía no llama a `AddInfrastructure` ni a `ApplyMigrationsAsync`. Por responsabilidad de Luciana, no se modificaron archivos de `Availability.Api` ni su `.csproj`. T1.10 continúa bloqueada hasta coordinar U-15.
+
+**Por dónde continuar ya mismo:** avisar a Luciana que U-15 sigue pendiente y pedirle que confirme la integración de `AddInfrastructure(builder.Configuration)`, `ApplyMigrationsAsync()` y `Microsoft.EntityFrameworkCore.Design`; coordinar con ella/Felipe el servicio API de Compose, el `depends_on: condition: service_healthy` y las variables acordadas (`Booking__BaseUrl`, `Keycloak__TokenEndpoint`, `Keycloak__ClientSecret`). Después, generar/verificar la migración (T1.10/T1.11) y coordinar la prueba integrada de `BookingClient` (T4.10) cuando API, Keycloak y Booking estén disponibles.

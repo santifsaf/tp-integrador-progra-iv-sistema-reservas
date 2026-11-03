@@ -33,7 +33,7 @@
 | **BR-08** | No pueden existir dos solicitudes con el mismo `Id`. | §5 |
 | **BR-09** | `SaveAsync` persiste la solicitud tal como la recibe: no completa datos ni aplica reglas de negocio. | §7.1 RF-3 |
 | **BR-10** | Los estados válidos son `Received`, `Published` y `PublishFailed`. El flujo es `Received` al guardar y luego `Published` o `PublishFailed` tras intentar publicar. | §5, §9, Feli (2026-11-02) |
-| **BR-11** | `UpdateStatusAsync` modifica únicamente el estado de una solicitud existente. | §7.1 RF-3 |
+| **BR-11** | `UpdateStatusAsync` modifica únicamente el estado de una solicitud existente y lanza `KeyNotFoundException` si el `Id` no existe. | §7.1 RF-3, decisión de implementación (2026-11-03) |
 | **BR-12** | Cada operación de escritura del repositorio guarda sus cambios por sí misma. | §7.1 RF-3 |
 | **BR-13** | `GetByIdAsync` devuelve `null` si la solicitud no existe. | §7.1 RF-3 |
 | **BR-14** | `GetByUserIdAsync` devuelve únicamente las solicitudes del usuario indicado. | §7.1 RF-3 |
@@ -60,8 +60,9 @@
 | **BR-24** | `GET /api/events/{eventId}/occupied-seats` devuelve **solo** los asientos ocupados, con la forma `[{ "seatId", "isOccupied" }]`. | §8.2 |
 | **BR-25** | Si el evento no tiene reservas, Booking responde `200` con lista vacía, y eso significa "ningún asiento ocupado". | §8.2, §7.3 RF-16 |
 | **BR-26** | `GetOccupiedSeatIdsAsync` devuelve el conjunto de `seatId` cuyo `isOccupied` es `true`. | §7.3 RF-16 |
-| **BR-27** | `GetStatusByRequestIdAsync` devuelve `null` cuando Booking responde `404`. | §7.3 RF-15 |
+| **BR-27** | `GetStatusByRequestIdAsync` devuelve `null` cuando Booking responde `404`, que significa que todavía no existe una reserva procesada para la solicitud; Availability lo presenta como pendiente si la solicitud existe localmente. | §7.3 RF-15, contrato de Booking verificado (2026-11-03) |
 | **BR-28** | Ante cualquier error distinto de `404`, o ante una caída de Booking, el cliente lanza `Availability.Application.Common.ExternalServiceUnavailableException`. El `404` de la consulta de estado se interpreta como ausencia de la reserva y devuelve `null`. | §7.3 RF-15 |
+| **BR-45** | `GetStatusByRequestIdAsync` deserializa la respuesta `200` de Booking con las propiedades `status` y `description`, correspondientes a `BookingReservationStatusDto(Status, Description)`; `description` puede ser `null`. | Contrato de Booking verificado (2026-11-03) |
 
 ## 5. Autenticación entre servicios
 
@@ -94,7 +95,15 @@
 
 | ID | Regla | Origen |
 |---|---|---|
-| **BR-41** | Cada operación de Infrastructure registra inicio, resultado y fin (`Started`, `Completed`, `Failed`) con el `requestId` como correlación. | §12 |
+| **BR-41** | Cada operación registra inicio, resultado y fin (`Started`, `Completed`, `Failed`) con una correlación estable: `requestId` para el flujo de reserva y el ID HTTP para consultas sin `requestId`. | §12, decisión aceptada (2026-11-03) |
+
+## 9. Orden de resultados
+
+| ID | Regla | Origen |
+|---|---|---|
+| **BR-42** | `GetByUserIdAsync` ordena por `CreatedAt` descendente; `EventRepository.GetAllAsync` por `StartsAt` ascendente; y `SeatRepository.GetByEventAsync` por `Label` ascendente. En los tres casos, `Id` ascendente desempata para garantizar un orden estable. | Decisión de Rebeca conversada con Feli (2026-11-03) |
+| **BR-43** | Los logs estructurados usan Serilog con los campos `Service`, `Operation`, `Event` y `CorrelationId`; incluyen duración, status HTTP y excepción cuando corresponda. No registran secretos, tokens, connection strings ni payloads sensibles. | Decisión aceptada (2026-11-03) |
+| **BR-44** | Las llamadas a Booking usan `X-Correlation-ID`: `requestId` para operaciones de reserva y el ID recibido o generado por el middleware HTTP para consultas sin `requestId`. | Decisiones aceptadas (2026-11-03) |
 
 ---
 
@@ -104,12 +113,7 @@ Estas reglas todavía no están cerradas. Cuando se confirmen, pasan a las secci
 
 | ID | Regla propuesta | Con quién | Origen |
 |---|---|---|---|
-| **BR-P-02** | `UpdateStatusAsync` lanza una excepción si el `Id` no existe. | Feli | §11 |
 | **BR-P-04** | Si Booking no responde, Application decide qué devolver; el cliente solo lanza la excepción. | Feli | §11 |
 | **BR-P-05** | `ReservationRequestedMessage` vive en Infrastructure (carpeta `Messaging`), por ser el contrato de transporte. | Feli | §11 |
 | **BR-P-06** | El sobre del mensaje puede llevar propiedades extra (como `Subject` con el tipo de evento) si Booking las necesita. | Gian | §11 |
 | **BR-P-07** | `requestedAt` se deserializa como `DateTimeOffset` en el consumidor de Booking. | Gian | §11 |
-| **BR-P-08** | La consulta de estado devuelve `Status` y `Description` (por ejemplo, el motivo de rechazo) en el formato que confirme Santi. | Santi | §11 |
-| **BR-P-09** | Si Booking todavía no procesó la solicitud, la consulta de estado responde `404` o un estado `PENDING`; Infrastructure lo interpreta como "aún no procesada". | Santi | §11 |
-| **BR-P-10** | Cada llamada a Booking envía el header `X-Correlation-Id` con el `requestId`. | Santi | §7.3 RF-17 |
-| **BR-P-11** | Las listas de solicitudes por usuario se devuelven de la más reciente a la más antigua, y los asientos de un evento ordenados por `Label`. | Feli | §7.1 RF-3, RF-6 |

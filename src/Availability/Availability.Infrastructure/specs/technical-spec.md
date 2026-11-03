@@ -35,13 +35,13 @@ Fuera de alcance: casos de uso, DTO de Application y entidades (Feli), endpoints
 |---|---|---|
 | Framework | `net10.0` | Confirmado |
 | Base de datos | PostgreSQL, una base por servicio | Confirmado |
-| Versión de la imagen de PostgreSQL | — | Pendiente |
+| Versión de la imagen de PostgreSQL | `postgres:16` para Availability | Acordado (2026-11-03) |
 | ORM y provider | EF Core con `Npgsql.EntityFrameworkCore.PostgreSQL` | Confirmado |
 | Broker | Azure Service Bus (topic `grupo5-booking-topic`, suscripción `booking`) | Confirmado |
 | Servidor de autorización | Keycloak 26.4, realm `seat-reservation`, puerto `8081` | Confirmado |
 | Resiliencia HTTP | `Microsoft.Extensions.Http.Resilience` (basado en Polly) | Propuesta técnica |
 | Resiliencia del publisher | Reintentos del propio SDK de Service Bus | Propuesta técnica (ver sección 8) |
-| Logging | `ILogger<T>` (`Microsoft.Extensions.Logging`) | Propuesta técnica; proveedor pendiente |
+| Logging | Serilog con logs estructurados a consola; consumo mediante `ILogger<T>` | Convención acordada (2026-11-03); falta integrar el formato y middleware en Api |
 | Framework de pruebas | — | Pendiente |
 
 Las versiones exactas de los paquetes se fijan al agregarlos, usando la última estable compatible con .NET 10.
@@ -67,6 +67,7 @@ Availability.Infrastructure/
 ├── Http/
 │   ├── BookingClient.cs
 │   ├── BookingAuthHandler.cs
+│   ├── CorrelationIdHandler.cs
 │   └── KeycloakTokenProvider.cs
 ├── Options/
 │   ├── ServiceBusOptions.cs
@@ -96,15 +97,17 @@ Todo valor que cambia según el entorno va en configuración, nunca escrito en e
 
 | Clave | Variable de entorno | Contenido | Estado |
 |---|---|---|---|
-| `ConnectionStrings:AvailabilityDb` | `ConnectionStrings__AvailabilityDb` | Conexión a PostgreSQL | Pendiente el host y las credenciales del compose |
+| `ConnectionStrings:AvailabilityDb` | `ConnectionStrings__AvailabilityDb` | Docker: host `availability-db`, puerto `5432`; local: host `localhost`, puerto `5433` | Variables `AVAILABILITY_DB_NAME`, `AVAILABILITY_DB_USER`, `AVAILABILITY_DB_PASSWORD` en `.env`; el servicio DB ya está en compose |
 | `ServiceBus:ConnectionString` | `ServiceBus__ConnectionString` | Connection string del broker (la entrega el profesor) | Confirmado; es un secreto |
 | `ServiceBus:TopicName` | `ServiceBus__TopicName` | `grupo5-booking-topic` | Confirmado |
-| `Booking:BaseUrl` | `Booking__BaseUrl` | Dirección de Booking en el compose | Pendiente |
-| `Keycloak:TokenEndpoint` | `Keycloak__TokenEndpoint` | URL del token endpoint | Ver nota |
+| `Booking:BaseUrl` | `Booking__BaseUrl` | Docker: `http://booking:8080/`; local: `http://localhost:5200/` | Acordado; falta configurar en Api |
+| `Keycloak:TokenEndpoint` | `Keycloak__TokenEndpoint` | Docker: `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; local: `http://localhost:8081/realms/seat-reservation/protocol/openid-connect/token` | Acordado; falta configurar en Api |
 | `Keycloak:ClientId` | `Keycloak__ClientId` | `availability` | Confirmado |
-| `Keycloak:ClientSecret` | `Keycloak__ClientSecret` | Secreto del client `availability` | Confirmado que es secreto; nombre de la variable en el contenedor de Availability pendiente |
+| `Keycloak:ClientSecret` | `Keycloak__ClientSecret` | Secreto del client `availability`, tomado de `${AVAILABILITY_CLIENT_SECRET}` por Compose | Convención acordada; falta agregar el servicio de la API a compose |
 
-**Nota sobre el token endpoint.** Desde la máquina del desarrollador es `http://localhost:8081/realms/seat-reservation/protocol/openid-connect/token`. Desde otro contenedor del compose, `localhost` no apunta a Keycloak, así que el host cambia (propuesta: `http://keycloak:8081/...`). Hay que verificar con Felipe qué valor usar y cómo afecta al emisor (`iss`) del token, porque el compose configura `KC_HOSTNAME` en `http://localhost:8081`.
+**Nota sobre el token endpoint.** Desde la máquina del desarrollador se usa `localhost`; desde el contenedor se usa el DNS de Compose `keycloak`. Felipe confirmó que el emisor (`iss`) sigue siendo `http://localhost:8081/realms/seat-reservation`.
+
+La base de Availability publica `5433:5432`: la API ejecutada en el host usa `localhost:5433`; una API dentro de Compose usa `availability-db:5432`. Al integrar la API en Compose, deberá esperar a `availability-db` con `depends_on: condition: service_healthy`.
 
 **Secretos.** El compose toma los secretos de las variables `${...}` de un archivo `.env` que no se versiona. El repositorio solo contiene `.env.example` con los nombres de las variables y sin valores reales.
 
@@ -226,7 +229,6 @@ public class ReservationRequestRepository : IReservationRequestRepository
             .Where(x => x.Id == id)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, status), ct);
 
-        // PENDIENTE (BR-P-02): qué hacer si no existe. Propuesta: lanzar una excepción.
         if (rows == 0) throw new KeyNotFoundException($"No existe la solicitud {id}.");
     }
 
@@ -234,11 +236,12 @@ public class ReservationRequestRepository : IReservationRequestRepository
     public Task<ReservationRequest?> GetByIdAsync(Guid id, CancellationToken ct) =>
         _db.ReservationRequests.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
 
-    // Solo las del usuario (BR-14). PENDIENTE (BR-P-11): orden; propuesta: más recientes primero.
+    // Solo las del usuario, más recientes primero; Id desempata para un orden estable (BR-14, BR-42).
     public async Task<IReadOnlyList<ReservationRequest>> GetByUserIdAsync(Guid userId, CancellationToken ct) =>
         await _db.ReservationRequests.AsNoTracking()
             .Where(x => x.UserId == userId)
             .OrderByDescending(x => x.CreatedAt)
+            .ThenBy(x => x.Id)
             .ToListAsync(ct);
 }
 
@@ -247,17 +250,18 @@ public class SeatRepository : ISeatRepository
     private readonly AvailabilityDbContext _db;
     public SeatRepository(AvailabilityDbContext db) => _db = db;
 
-    // PENDIENTE (BR-P-11): orden; propuesta: por Label.
+    // Orden por etiqueta; Id desempata para un orden estable (BR-42).
     public async Task<IReadOnlyList<Seat>> GetByEventAsync(Guid eventId, CancellationToken ct) =>
-        await _db.Seats.AsNoTracking().Where(s => s.EventId == eventId).OrderBy(s => s.Label).ToListAsync(ct);
+        await _db.Seats.AsNoTracking().Where(s => s.EventId == eventId)
+            .OrderBy(s => s.Label).ThenBy(s => s.Id).ToListAsync(ct);
 
     // Se verifica el PAR evento + asiento (BR-01).
     public Task<bool> ExistsAsync(Guid eventId, Guid seatId, CancellationToken ct) =>
         _db.Seats.AsNoTracking().AnyAsync(s => s.Id == seatId && s.EventId == eventId, ct);
 }
 
-// EventRepository: GetAllAsync y GetByIdAsync, ambos de solo lectura con AsNoTracking (BR-03).
-// Orden de GetAllAsync: no definido todavía; propuesta: por StartsAt.
+// EventRepository: GetAllAsync y GetByIdAsync son de solo lectura con AsNoTracking (BR-03).
+// GetAllAsync ordena por StartsAt ascendente e Id ascendente (BR-42).
 ```
 
 El catálogo es de solo lectura (BR-03): ninguno de estos repositorios tiene operaciones de escritura sobre `Events` ni `Seats`.
@@ -475,54 +479,13 @@ El `KeycloakTokenProvider` se registra como singleton, para que la caché sea un
 
 ### 7.2 `BookingClient`
 
-```csharp
-public class BookingClient : IBookingClient
-{
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private readonly HttpClient _http;
-    private readonly ILogger<BookingClient> _logger;
+`BookingClient` implementa `IBookingClient` y se registra en `AddInfrastructure` para usar el `HttpClient` nombrado `Booking`, con los handlers de autenticación y correlación.
 
-    public BookingClient(HttpClient http, ILogger<BookingClient> logger) { _http = http; _logger = logger; }
+- `GetOccupiedSeatIdsAsync` consulta `GET api/events/{eventId}/occupied-seats`, deserializa los pares `seatId`/`isOccupied` y devuelve solo los identificadores ocupados. Una lista vacía en una respuesta exitosa devuelve un conjunto vacío.
+- `GetStatusByRequestIdAsync` consulta `GET api/reservations/by-request/{requestId}` y envía el propio `requestId` en `X-Correlation-ID`. Un `404` devuelve `null`; una respuesta exitosa se deserializa a `BookingReservationStatusDto` (`status`, `description`).
+- Errores HTTP distintos del `404` de estado, fallos de transporte, timeouts o respuestas inválidas se exponen como `ExternalServiceUnavailableException`. La cancelación solicitada por el llamador se propaga.
 
-    // Booking es la fuente de verdad de la ocupación (BR-22). Devuelve solo los ocupados (BR-24);
-    // una lista vacía con 200 significa "nada ocupado" (BR-25).
-    public async Task<IReadOnlySet<Guid>> GetOccupiedSeatIdsAsync(Guid eventId, CancellationToken ct)
-    {
-        try
-        {
-            using var response = await _http.GetAsync($"api/events/{eventId}/occupied-seats", ct);
-            response.EnsureSuccessStatusCode();
-            var items = await response.Content.ReadFromJsonAsync<List<OccupiedSeatResponse>>(Json, ct) ?? [];
-            return items.Where(i => i.IsOccupied).Select(i => i.SeatId).ToHashSet(); // BR-26
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
-        {
-            throw new ExternalServiceUnavailableException("No se pudo consultar la ocupación en Booking.", ex); // BR-28
-        }
-    }
-
-    public async Task<BookingReservationStatusDto?> GetStatusByRequestIdAsync(Guid requestId, CancellationToken ct)
-    {
-        try
-        {
-            using var response = await _http.GetAsync($"api/reservations/by-request/{requestId}", ct);
-            if (response.StatusCode == HttpStatusCode.NotFound) return null; // BR-27
-            response.EnsureSuccessStatusCode();
-            // PENDIENTE (BR-P-08): confirmar con Santi que el JSON coincide con (Status, Description).
-            return await response.Content.ReadFromJsonAsync<BookingReservationStatusDto>(Json, ct);
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
-        {
-            throw new ExternalServiceUnavailableException("No se pudo consultar el estado en Booking.", ex); // BR-28
-        }
-    }
-
-    // Tipo interno que refleja el JSON de Booking; no es un DTO de Application.
-    private sealed record OccupiedSeatResponse(Guid SeatId, bool IsOccupied);
-}
-```
-
-Un `404` en la consulta de estado se interpreta como `null` (BR-27). Qué significa ese `null` según el momento (solicitud todavía no procesada) queda pendiente con Santi (BR-P-09). El header `X-Correlation-Id` (BR-P-10) todavía no se envía.
+Un `404` en la consulta de estado se interpreta como `null` (BR-27): Booking todavía no tiene una reserva para esa solicitud, y Availability lo presenta como pendiente si existe localmente. Las llamadas a Booking usan `X-Correlation-ID`: `requestId` en la consulta de estado y el ID del middleware en consultas sin `requestId`.
 
 ## 8. Reintentos y timeouts
 
@@ -556,13 +519,14 @@ El SDK de Azure Service Bus ya trae su propia política de reintentos (`ServiceB
 
 ## 9. Logs de auditoría
 
-**Confirmado:**
+**Convención acordada (2026-11-03):**
 
 - El id de la solicitud (`requestId`) es el `correlationId` en los tres servicios y aparece en Availability, en el mensaje del broker y en Booking (BR-19, BR-41).
 - Cada operación registra inicio, resultado y fin con `Started`, `Completed` y `Failed`.
-- Otras políticas de logs (formato, proveedor, campos) todavía no se definieron con Felipe.
+- Serilog es el proveedor acordado; se deben emitir logs estructurados a consola con `Service`, `Operation`, `Event` y `CorrelationId`. El formato actual de la API aún no muestra todas las propiedades estructuradas y requiere integración de Luciana.
+- Se agregan duración, status HTTP y excepción cuando corresponda. Nunca se registran secretos, tokens, connection strings ni payloads sensibles.
 
-**Propuesta técnica:** usar `ILogger<T>` y abrir un *scope* con el `requestId` en cada operación, de modo que todos los logs de esa operación lo lleven sin repetirlo. Cuando Felipe defina el formato, solo cambia la configuración, no el código de la capa.
+Los componentes usan `ILogger<T>` y scopes para incluir la correlación en los logs de la operación:
 
 ```csharp
 using var scope = _logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = requestId });
@@ -575,8 +539,8 @@ _logger.LogInformation("{Operation} Completed", operation);   // o LogError(...,
 |---|---|---|
 | Publicación del mensaje | `ServiceBusReservationPublisher` | `requestId` |
 | Consulta del estado a Booking | `BookingClient` | `requestId` |
+| Consulta de ocupación a Booking | `BookingClient` | ID recibido o generado por el middleware HTTP |
 | Guardar o actualizar la solicitud | `ReservationRequestRepository` | `requestId` |
-| Consulta de ocupación a Booking | `BookingClient` | No hay `requestId`; **pendiente** (ver sección 13) |
 
 Nunca se registran secretos, tokens ni la connection string.
 
@@ -589,7 +553,7 @@ Nunca se registran secretos, tokens ni la connection string.
 | Booking responde `404` en el estado | Devuelve `null` | BR-27 |
 | Booking no responde o responde con error | Lanza `ExternalServiceUnavailableException` | BR-28 |
 | Solicitud inexistente en `GetByIdAsync` | Devuelve `null` | BR-13 |
-| Solicitud inexistente en `UpdateStatusAsync` | Propuesta: lanza una excepción | BR-P-02 |
+| Solicitud inexistente en `UpdateStatusAsync` | Lanza `KeyNotFoundException` | BR-11 |
 
 La excepción compartida para fallas de servicios externos está definida en Application:
 
@@ -683,15 +647,10 @@ Para el publisher y el cliente HTTP no hace falta ni el broker ni Booking: el cl
 
 | Regla | Con quién |
 |---|---|
-| BR-P-02 `UpdateStatusAsync` si el `Id` no existe | Feli |
 | BR-P-04 Qué hace Application si Booking no responde | Feli |
 | BR-P-05 Ubicación de `ReservationRequestedMessage` | Feli |
 | BR-P-06 Propiedades extra en el sobre del mensaje | Gian |
 | BR-P-07 `requestedAt` como `DateTimeOffset` en el consumidor | Gian |
-| BR-P-08 Forma del JSON de la consulta de estado | Santi |
-| BR-P-09 Respuesta cuando Booking aún no procesó la solicitud | Santi |
-| BR-P-10 Header `X-Correlation-Id` | Santi |
-| BR-P-11 Orden de las listas | Feli |
 
 ## 14. Orden sugerido de implementación
 
