@@ -90,7 +90,7 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 | **U-13** | **Convención acordada (2026-11-03):** mantener Serilog y usar logs estructurados con `Service`, `Operation`, `Event`, `CorrelationId`; agregar duración, status HTTP y excepción cuando corresponda, sin registrar secretos ni payloads sensibles. La configuración de Serilog y el middleware de API requieren integración de Luciana; Infrastructure ya registra algunos eventos estructurados. | Felipe / Rebeca | T5.5, T5.7 |
 | **U-14** | **Decisión confirmada (2026-11-03):** usar `requestId` en operaciones de reserva y el ID del middleware HTTP en consultas sin `requestId`; propagarlo a Booking como `X-Correlation-ID`. El cliente de Infrastructure fija `requestId` en la consulta de estado y el handler propaga el ID HTTP para otras consultas. | Felipe / Feli / Luciana | T5.6 |
 | **U-15** | Proyecto Api con el paquete `Microsoft.EntityFrameworkCore.Design` y un `Program.cs` que llame a `AddInfrastructure` y `ApplyMigrationsAsync`; coordinar además la configuración y el servicio API en Compose con Felipe. | Luciana / Felipe | T1.10, T2.3, T2.5, integración de U-09/U-11 |
-| **U-16** | Framework de pruebas y estrategia para los repositorios (PostgreSQL real o base en memoria). | Grupo | T6.1 y todas las pruebas de F6 |
+| **U-16** | **Resuelto:** suite propia `Availability.Infrastructure.Tests` con xUnit; PostgreSQL real vía Testcontainers para repositorios, `HttpMessageHandler` falso para HTTP y doble de `ServiceBusSender`. | Grupo | T6.1 y todas las pruebas de F6 |
 | **U-17** | **Resuelto (2026-11-03):** usar los valores por defecto de `Microsoft.Extensions.Http.Resilience` para los clientes HTTP y del SDK de Service Bus para publicaciones; no definir valores personalizados. | Grupo | T5.1, T5.3, T5.4 |
 | **U-18** | **Resuelto (2026-11-03):** Service Bus usa solo los reintentos nativos del SDK; no agregar Polly ni una segunda política de reintentos al publisher. | Grupo | T5.2, T5.4 |
 | **U-19** | Ubicación y formato del historial de prompts (el reparto indica `/prompts` con `Nombre_Apellido.md` y la guía `prompts/Nombre_Apellido/`) y de la carpeta de decisiones. | Grupo / Felipe | T7.2, T7.3 |
@@ -244,21 +244,21 @@ Ordenados por cuántas tareas destraban:
 
 | ID | Tarea | Depende de | Estado | Provisorio posible |
 |---|---|---|---|---|
-| **T6.1** | Decidir con el grupo el framework de pruebas y si los repositorios se prueban contra PostgreSQL real o en memoria. Una base en memoria no reproduce algunas restricciones de PostgreSQL. | U-16 | **Bloqueada (U-16)** | — |
+| **T6.1** | Decidir con el grupo el framework de pruebas y si los repositorios se prueban contra PostgreSQL real o en memoria. Una base en memoria no reproduce algunas restricciones de PostgreSQL. | U-16 | **Resuelta:** xUnit y PostgreSQL real con Testcontainers; handlers HTTP falsos y doble de sender Service Bus. | — |
 
-Pruebas a escribir una vez resuelta T6.1:
+Pruebas de `Availability.Infrastructure.Tests`:
 
 | ID | Prueba | Regla | Depende de | Estado |
 |---|---|---|---|---|
-| **T6.2** | `SaveAsync` con `Id` repetido falla | BR-08 | T6.1, F1 | **Bloqueada (U-16)** |
-| **T6.3** | `UpdateStatusAsync` cambia el estado, lanza `KeyNotFoundException` si el Id no existe y los tres valores del enum se guardan y se leen | BR-10, BR-11 | T6.1, F1 | **Bloqueada (U-16)** |
-| **T6.4** | `ExistsAsync` es `false` si el asiento no pertenece al evento | BR-01 | T6.1, F1 | **Bloqueada (U-16)** |
-| **T6.5** | `GetByUserIdAsync` devuelve solo las solicitudes del usuario en orden de `CreatedAt` descendente y `Id` ascendente | BR-14, BR-42 | T6.1, F1 | **Bloqueada (U-16)** |
-| **T6.6** | El seed carga al menos un evento con asientos y es reproducible | BR-04 | T6.1, F1 | **Bloqueada (U-16)** |
-| **T6.7** | El publisher envía el JSON acordado con `MessageId` y `CorrelationId` iguales al `requestId` | BR-17, BR-19 | T6.1, F3 | **Bloqueada (U-16)** |
-| **T6.8** | El cliente devuelve los `seatId` con `isOccupied` en `true`, y vacío si Booking responde `200` con lista vacía (con un `HttpMessageHandler` falso) | BR-25, BR-26 | T6.1, F4 | **Bloqueada (U-16)** |
-| **T6.9** | `GetStatusByRequestIdAsync` devuelve `null` con `404` y lanza excepción ante un error | BR-27, BR-28 | T6.1, F4 | **Bloqueada (U-16)** |
-| **T6.10** | El token se pide una sola vez mientras es válido y se envía en cada llamada | BR-29, BR-30 | T6.1, F4 | **Bloqueada (U-16)** |
+| **T6.2** | `SaveAsync` con `Id` repetido falla | BR-08 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
+| **T6.3** | `UpdateStatusAsync` cambia el estado, lanza `KeyNotFoundException` si el Id no existe y los tres valores del enum se guardan y se leen | BR-10, BR-11 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
+| **T6.4** | `ExistsAsync` es `false` si el asiento no pertenece al evento | BR-01 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
+| **T6.5** | `GetByUserIdAsync` devuelve solo las solicitudes del usuario en orden de `CreatedAt` descendente y `Id` ascendente | BR-14, BR-42 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
+| **T6.6** | El seed carga al menos un evento con asientos y es reproducible | BR-04 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
+| **T6.7** | El publisher envía el JSON acordado con `MessageId` y `CorrelationId` iguales al `requestId` | BR-17, BR-19 | T6.1, F3 | **Implementada y verificada** |
+| **T6.8** | El cliente devuelve los `seatId` con `isOccupied` en `true`, y vacío si Booking responde `200` con lista vacía (con un `HttpMessageHandler` falso) | BR-25, BR-26 | T6.1, F4 | **Implementada y verificada** |
+| **T6.9** | `GetStatusByRequestIdAsync` devuelve `null` con `404` y lanza excepción ante un error | BR-27, BR-28 | T6.1, F4 | **Implementada y verificada** |
+| **T6.10** | El token se pide una sola vez mientras es válido y se envía en cada llamada | BR-29, BR-30 | T6.1, F4 | **Implementada y verificada** |
 
 **Se considera terminada cuando:** todas las pruebas pasan y cubren los criterios de aceptación del brief.
 **PR 6:** `test(availability): pruebas de la capa Infrastructure`.
@@ -294,12 +294,12 @@ Pruebas a escribir una vez resuelta T6.1:
 | F3 | 10 | 9 | 0 | 1 |
 | F4 | 11 | 7 | 0 | 4 |
 | F5 | 7 | 4 | 3 | 0 |
-| F6 | 10 | 0 | 0 | 10 |
+| F6 | 10 | 5 | 5 | 0 |
 | F7 | 6 | 0 | 1 | 5 |
-| **Total** | **67** | **36** | **6** | **25** |
+| **Total** | **67** | **41** | **11** | **15** |
 
 **Criterio del resumen:** "Parciales" incluye tareas con una parte externa o de integración todavía pendiente; "Pendientes o bloqueadas" incluye las dependientes de decisiones, responsables externos, servicios reales o cierre de fases. T0.6 y T1.1 quedan parciales hasta compartir la configuración y los GUID del seed, respectivamente. T3.7 se confirmó mergeada en `origin/develop`.
 
-**Desbloqueos recientes:** U-03 permitió completar T1.7, U-04 T1.9, U-07 T4.7 y U-17/U-18 T5.1–T5.4. T4.6–T4.9 y T4.11 también están implementadas. U-08 a U-14 tienen decisiones confirmadas. De U-09 solo está implementado el contenedor de base; la API aún no está en Compose, por lo que siguen pendientes `depends_on` y el mapeo del secreto U-11. Las direcciones acordadas para U-10/U-12 tampoco están configuradas en la API. La revisión confirmó que [Availability.Api.csproj](../../Availability.Api/Availability.Api.csproj) aún no referencia `Microsoft.EntityFrameworkCore.Design` y [Program.cs](../../Availability.Api/Program.cs) todavía no llama a `AddInfrastructure` ni a `ApplyMigrationsAsync`. Por responsabilidad de Luciana, no se modificaron archivos de `Availability.Api` ni su `.csproj`. T1.10 continúa bloqueada hasta coordinar U-15.
+**Desbloqueos recientes:** U-03 permitió completar T1.7, U-04 T1.9, U-07 T4.7 y U-17/U-18 T5.1–T5.4. U-16 quedó resuelta con el acuerdo de xUnit, PostgreSQL vía Testcontainers, handlers HTTP falsos y doble de Service Bus. T6.7–T6.10 están verificadas; T6.2–T6.6 están implementadas, pero su ejecución requiere Docker disponible. T4.6–T4.9 y T4.11 también están implementadas. U-08 a U-14 tienen decisiones confirmadas. De U-09 solo está implementado el contenedor de base; la API aún no está en Compose, por lo que siguen pendientes `depends_on` y el mapeo del secreto U-11. Las direcciones acordadas para U-10/U-12 tampoco están configuradas en la API. La revisión confirmó que [Availability.Api.csproj](../../Availability.Api/Availability.Api.csproj) aún no referencia `Microsoft.EntityFrameworkCore.Design` y [Program.cs](../../Availability.Api/Program.cs) todavía no llama a `AddInfrastructure` ni a `ApplyMigrationsAsync`. T1.10 continúa bloqueada hasta coordinar U-15.
 
-**Por dónde continuar ya mismo:** coordinar con Luciana U-15 (`AddInfrastructure`, `ApplyMigrationsAsync` y `Microsoft.EntityFrameworkCore.Design`) y con ella/Felipe el servicio API en Compose, `depends_on: condition: service_healthy` y las variables acordadas. Cuando eso esté integrado, generar/verificar la migración (T1.10/T1.11) y probar `BookingClient` contra servicios reales (T4.10). T3.9 requiere autorización y acceso para publicar en Service Bus; F6 requiere resolver U-16; F7 sigue sujeto a U-19/U-20 y al cierre de fases.
+**Por dónde continuar ya mismo:** coordinar con Luciana U-15 (`AddInfrastructure`, `ApplyMigrationsAsync` y `Microsoft.EntityFrameworkCore.Design`) y con ella/Felipe el servicio API en Compose, `depends_on: condition: service_healthy` y las variables acordadas. Cuando eso esté integrado, generar/verificar la migración (T1.10/T1.11) y probar `BookingClient` contra servicios reales (T4.10). T3.9 requiere autorización y acceso para publicar en Service Bus; para completar F6, ejecutar T6.2–T6.6 con Docker disponible; F7 sigue sujeto a U-19/U-20 y al cierre de fases.
