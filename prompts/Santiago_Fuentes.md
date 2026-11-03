@@ -20,21 +20,10 @@ Reutiliza las interfaces y entidades existentes, respeta la separacion de respon
 
 Una vez implementado, repasemos cada fragmento de codigo. 
 
-### Resultado de la implementación
-- Endpoint GET /api/reservations/by-request/{requestId}.
-- Servicio de consulta y DTO en Booking.Business.
-- Validación JWT y autorización para Availability.
-- Manejo centralizado de excepciones mediante ProblemDetails.
-- Pruebas unitarias y pruebas HTTP.
 
 ### Correcciones
 - El manejador de excepciones podia perder el requestId al leer los valores de ruta. Decidi recuperarlo mediante IExceptionHandlerFeature, para conservar la correlación en los logs, y agregar una prueba que lo verifique.
 
-Archivos modificados:
-
--BookingExceptionHandler.cs: corregí la recuperación del identificador.
-
--ReservationStatusEndpointTests.cs: agregue dos casos que verifican el requestId en los logs de errores 500 y 503.
 
 
 ## Prompt 03
@@ -48,15 +37,6 @@ El proveedor debe enviar las credenciales como formulario HTTP, leer access_toke
 Agrega pruebas de la solicitud enviada, la lectura del token, los errores y la cancelacion.
 
 
-### Resultado de la implementacion
-
-- Clase de opciones para la configuracion de Payment.
-- Proveedor de tokens de Booking mediante client_credentials.
-- Secreto configurado fuera de appsettings.json.
-- Tratamiento de errores HTTP, respuestas invalidas y cancelacion.
-- 10 casos de prueba del proveedor de tokens.
-
-
 ## Prompt 04
 
 Implementa el componente de comunicacion de Booking con Payment utilizando el contrato compartido payment.proto y el proveedor de tokens preparado anteriormente.
@@ -67,24 +47,11 @@ Implementa Charge y GetPayment. Conserva el identificador de operacion recibido 
 
 Envia el token como metadata de autorizacion y propaga RequestId mediante x-correlation-id. Configura deadline, timeout de autenticacion y CancellationToken.
 
-### Resultado de la implementacion
-
-- DTO PaymentCharge con los datos explicitos del cobro.
-- Gateway gRPC con operaciones Charge y GetPayment.
-- Conservacion del identificador de operacion recibido.
-- Envio del token de Booking y del identificador de correlacion mediante metadata.
-- Soporte para deadline, timeout de autenticacion y cancelacion.
-- Generacion del cliente desde el contrato payment.proto aprobado.
 
 ### Correcciones
 
 -Se corrigio la validacion de AmountCents para exigir un importe mayor que cero, de acuerdo con las restricciones del servidor Payment. Se agrego una prueba que comprueba que el importe cero se rechaza antes de solicitar el token o realizar una llamada gRPC.
 
-Archivos modificados:
-
--GrpcPaymentGateway.cs: validación de importes mayores que cero.
-
--GrpcPaymentGatewayTests.cs: prueba del rechazo de importes iguales a cero.
 
 ## Prompt 05
 
@@ -92,22 +59,27 @@ Mapea las respuestas explicitas de Payment a los resultados existentes de Busine
 
 Registra los componentes mediante inyeccion de dependencias, valida la configuracion y agrega pruebas de las llamadas, los resultados y los errores.
 
-### Resultado de la implementacion
-
-- Mapeo de respuestas de Payment al enum PaymentResult de Business.
-- Tratamiento de estados pendientes, desconocidos y errores tecnicos como Uncertain.
-- Propagacion de la cancelacion del solicitante, diferenciada de los timeouts internos.
-- Registro de los componentes mediante AddPaymentCommunication.
-- Validacion de direcciones, credenciales y tiempos configurados.
-- Comentarios sobre el rol del Gateway/Adapter y su alcance.
-- Casos de prueba del gateway y la configuracion.
-- Solucion compilada sin errores ni advertencias y 109 pruebas aprobadas.
-- Pendiente: adaptacion desde Reservation a IPaymentClient y validacion contra los servicios reales.
 
 ### Correcciones
 
 - Se corrigio el diagnostico de los timeouts. Un deadline gRPC agotado puede producir OperationCanceledException sin que el solicitante haya cancelado. Se agrego el registro de la etapa (Authentication o Grpc) para identificar donde ocurrio el problema y una prueba que verifica el caso. El resultado continua siendo Uncertain, mientras que la cancelacion del solicitante se propaga.
 
-Archivos modificados:
-- GrpcPaymentGateway.cs: identificacion de la etapa y registro del fallo.
-- GrpcPaymentGatewayTests.cs: prueba del deadline representado como cancelacion interna.
+
+## Prompt 06
+
+Implementa ReservationPaymentClient como adaptador entre IPaymentClient y GrpcPaymentGateway, sin modificar la interfaz existente.
+
+Agrega AmountCents y Currency a Reservation, sin asignar valores predeterminados. Utiliza Reservation.Id como PaymentOperationId para conservar la misma operación de cobro en los reintentos.
+
+El adaptador debe delegar el cobro al gateway, propagar CancellationToken y devolver el resultado sin modificar el estado de la reserva. Los datos invalidos deben rechazarse antes de contactar a Payment.
+
+Registra el adaptador mediante inyeccion de dependencias y actualiza los comentarios necesarios. No modifiques SQL ni el consumidor, ya que esas partes siguen pendientes de integracion.
+
+
+## Prompt 07
+
+Agrega pruebas para verificar que ReservationPaymentClient envíe correctamente los identificadores, el importe y la moneda, y que conserve los datos originales entre reintentos.
+
+Comprueba que los resultados no modifiquen el estado de la reserva, que se propague la cancelación y que los datos inválidos se rechacen sin solicitar tokens ni realizar llamadas gRPC.
+
+Verifica tambien el registro de IPaymentClient mediante inyección de dependencias y la validacion de la configuración.
