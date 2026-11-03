@@ -4,7 +4,7 @@
 **Proyecto:** TP Final — Sistema de reserva de asientos (grupo 5)
 **Basado en:** `technical-spec.md`, `business-rules.md` y `product-brief.md` (2026-10-31)
 **Responsable:** Rebeca — capa Infrastructure
-**Última actualización:** 2026-10-31
+**Última actualización:** 2026-11-02
 
 ## Cómo leer este plan
 
@@ -16,6 +16,7 @@
 |---|---|
 | **Lista** | Se puede hacer ahora. Todo lo que necesita está cerrado. |
 | **Bloqueada (U-xx)** | Depende de una respuesta o decisión pendiente (sección 3). **No se avanza hasta que la confirmes**, o hasta que indiques que se avance con el valor provisorio. |
+| **Pendiente de autorización** | Las dependencias técnicas están resueltas, pero la ejecución requiere autorización para producir un efecto externo. |
 
 - La columna **Provisorio posible** muestra qué valor se usaría, tomado de las propuestas de la spec, **solo si autorizás** avanzar con él. Ese valor se marcaría como provisorio en el código y en la documentación hasta que se confirme.
 - "Lista (tras T0.1)" quiere decir que la tarea depende de otra tarea del plan y no de una respuesta externa.
@@ -75,11 +76,11 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 
 | ID | Qué falta | Con quién | Tareas que destraba |
 |---|---|---|---|
-| **U-02** | Dónde vive `ReservationRequestedMessage` (BR-P-05). | Feli | T3.2 |
+| **U-02** | **Resuelto:** vive en `/contracts/events/ReservationRequestedMessage.cs`, namespace `Booking.Business.Messages`; Infrastructure lo compila como archivo vinculado (BR-P-05). | Feli | T3.2 |
 | **U-03** | Qué hace `UpdateStatusAsync` si el `Id` no existe (BR-P-02). | Feli | T1.7 |
 | **U-04** | Orden de las listas (BR-P-11), incluido el de `GetAllAsync` de eventos, que no tiene definición. | Feli | T1.9 |
-| **U-05** | Propiedades extra del sobre del mensaje (BR-P-06) y lectura de `requestedAt` como `DateTimeOffset` (BR-P-07). | Gian | T3.5, T3.6 |
-| **U-06** | Verificar que la suscripción `booking` existe en el topic `grupo5-booking-topic`. | Gian / profesor | T3.1, T3.9 |
+| **U-05** | **Resuelto:** el mensaje incluye `AmountCents` y `Currency`, no agrega `correlationId` al cuerpo y `RequestedAt` es `DateTimeOffset` (BR-P-06, BR-P-07). | Gian | T3.5, T3.6 |
+| **U-06** | **Resuelto (2026-11-02):** se verificó desde una aplicación de consola externa que la suscripción `booking` existe en el topic `grupo5-booking-topic`. | Gian / profesor | T3.1, T3.9 |
 | **U-07** | Forma del JSON de la consulta de estado y qué devuelve si Booking aún no procesó la solicitud (BR-P-08, BR-P-09). | Santi | T4.7 |
 | **U-08** | Header `X-Correlation-Id` en las llamadas a Booking (BR-P-10). | Santi | T4.8 |
 | **U-09** | PostgreSQL en el compose: servicio, versión, host y credenciales para la connection string; `depends_on` con healthcheck. | Felipe | T1.11, T2.4, T2.5 |
@@ -100,12 +101,11 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 
 Ordenados por cuántas tareas destraban:
 
-1. **U-01 (Feli):** es el que más bloquea, porque sin las excepciones no se puede terminar el publisher ni el cliente de Booking.
-2. **U-09 a U-13 (Felipe):** se pueden preguntar en una sola conversación y destraban PostgreSQL, Keycloak y Booking en el compose.
-3. **U-15 (Luciana):** destraba la migración inicial y el arranque.
-4. **U-02, U-03 y U-04 (Feli):** son preguntas chicas que se pueden sumar a la de U-01.
-5. **U-07 y U-08 (Santi)** y **U-05 y U-06 (Gian).**
-6. **U-16, U-17 y U-18 (Grupo)** pueden esperar a las fases finales.
+1. **U-09 a U-13 (Felipe):** se pueden preguntar en una sola conversación y destraban PostgreSQL, Keycloak y Booking en el compose.
+2. **U-15 (Luciana):** destraba la migración inicial y el arranque.
+3. **U-03 y U-04 (Feli):** definen el caso de solicitud inexistente y el orden de las listas. U-02, U-05 y U-06 ya están resueltos.
+4. **U-07 y U-08 (Santi).**
+5. **U-16, U-17 y U-18 (Grupo)** pueden esperar a las fases finales.
 
 ---
 
@@ -178,16 +178,16 @@ Ordenados por cuántas tareas destraban:
 
 | ID | Tarea | Depende de | Estado | Provisorio posible |
 |---|---|---|---|---|
-| **T3.1** | Verificar que la suscripción `booking` existe en `grupo5-booking-topic`. Si no existe, los mensajes publicados se pierden sin avisar. | U-06 | **Bloqueada (U-06)** | — |
-| **T3.2** | Ubicar `ReservationRequestedMessage` (`RequestId`, `EventId`, `SeatId`, `UserId`, `RequestedAt`). | U-02 | **Bloqueada (U-02)** | `Infrastructure/Messaging` (spec §6.1) |
+| **T3.1** | Verificar que la suscripción `booking` existe en `grupo5-booking-topic`. Si no existe, los mensajes publicados se pierden sin avisar. | U-06 | **Confirmada externamente (2026-11-02)** | — |
+| **T3.2** | Vincular desde `/contracts/events` el `ReservationRequestedMessage` compartido (`RequestId`, `EventId`, `SeatId`, `UserId`, `RequestedAt`, `AmountCents`, `Currency`). | U-02 | **Implementada** | — |
 | **T3.3** | Registrar `ServiceBusClient` y `ServiceBusSender` como singleton, leyendo `ServiceBus:ConnectionString` y `ServiceBus:TopicName`, sin opciones de reintento. | F0 | Lista | — |
-| **T3.4** | `ServiceBusReservationPublisher`: mapear `ReservationRequest` al mensaje (`RequestId` = `Id`, `RequestedAt` = `CreatedAt`), serializar en JSON camelCase con `ContentType: application/json`, poner `MessageId` y `CorrelationId` iguales al `requestId`, y lanzar `ExternalServiceUnavailableException` si falla el envío. | T3.2, T3.3 | **Bloqueada (U-02)** | — |
-| **T3.5** | Propiedades extra en el sobre del mensaje, si Booking las necesita. | T3.4, U-05 | **Bloqueada (U-05)** | Ninguna: no se agrega nada hasta que Gian lo pida |
-| **T3.6** | Confirmar con Gian que su consumidor lee `requestedAt` como `DateTimeOffset`. | U-05 | **Bloqueada (U-05)** | — |
+| **T3.4** | `ServiceBusReservationPublisher`: mapear la solicitud y el evento (`AmountCents` = `Event.PriceCents`, `Currency` = `Event.Currency`), serializar en JSON camelCase con `ContentType: application/json`, usar `RequestId` para `MessageId` y `CorrelationId`, y lanzar `ExternalServiceUnavailableException` si falla el envío. | T3.2, T3.3 | **Implementada** | — |
+| **T3.5** | Incluir en el cuerpo `AmountCents` y `Currency`; no agregar `correlationId` al JSON. | T3.4, U-05 | **Resuelta por contrato** | — |
+| **T3.6** | Confirmar que el contrato define `RequestedAt` como `DateTimeOffset`. | U-05 | **Confirmada por contrato** | — |
 | **T3.7** | Subir el contrato del mensaje a `/contracts/events/` con una rama `chore/contracts-*` hacia `develop`, con aprobación de los dos subgrupos. **PR aparte.** Verificar primero si ya existe. | Contrato cerrado con Gian | Lista | — |
-| **T3.8** | Registrar el publisher en `AddInfrastructure`. | T3.4 | Lista (tras T3.4) | — |
-| **T3.9** | Verificar con un consumidor de prueba sobre la suscripción `booking` que llega el JSON acordado con los identificadores correctos. | T3.1, T3.4, U-06 | **Bloqueada (U-06)** | — |
-| **T3.10** | Comentar las decisiones: un solo sender reutilizado, `MessageId` igual al `requestId`, error que no se oculta. | T3.4 | Lista (tras T3.4) | — |
+| **T3.8** | Registrar el publisher en `AddInfrastructure`. | T3.4 | **Implementada** | — |
+| **T3.9** | Verificar con un consumidor de prueba sobre la suscripción `booking` que llega el JSON acordado con los identificadores correctos. | T3.1, T3.4, U-06 | **Pendiente para publicar en Service Bus** | — |
+| **T3.10** | Registrar inicio, finalización y falla con correlación por `requestId`; reutilizar un sender y no ocultar errores de envío. | T3.4 | **Implementada** | — |
 
 **Se considera terminada cuando:** el mensaje llega a la suscripción `booking` con el JSON acordado, y el `MessageId` y el `CorrelationId` coinciden con el `requestId` (BR-15 a BR-21).
 **PR 3:** `feat(availability): publisher de solicitudes en Service Bus`.
@@ -286,17 +286,17 @@ Pruebas a escribir una vez resuelta T6.1:
 
 ---
 
-## 12. Resumen de estado inicial
+## 12. Resumen de estado actual
 
-| Fase | Tareas | Listas | Bloqueadas |
-|---|---|---|---|
-| F0 | 6 | 6 | 0 |
-| F1 | 12 | 8 | 4 |
-| F2 | 5 | 2 | 3 |
-| F3 | 10 | 4 | 6 |
-| F4 | 11 | 4 | 7 |
-| F5 | 7 | 1 | 6 |
-| F6 | 10 | 0 | 10 |
-| F7 | 6 | 3 | 3 |
+| Fase | Tareas | Listas | Bloqueadas | Pendientes de autorización |
+|---|---|---|---|---|
+| F0 | 6 | 6 | 0 | 0 |
+| F1 | 12 | 8 | 4 | 0 |
+| F2 | 5 | 2 | 3 | 0 |
+| F3 | 10 | 9 | 0 | 1 |
+| F4 | 11 | 4 | 7 | 0 |
+| F5 | 7 | 1 | 6 | 0 |
+| F6 | 10 | 0 | 10 | 0 |
+| F7 | 6 | 3 | 3 | 0 |
 
 **Por dónde arrancar ya mismo, sin esperar a nadie:** T0.1 a T0.6, y después T1.1 a T1.6, T1.8 y T1.12 en paralelo con T3.3, T3.7, T4.1 y T4.2.

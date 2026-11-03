@@ -32,7 +32,7 @@
 | **BR-07** | `CreatedAt` lo genera Application y siempre está en UTC. | §7.1 RF-2 |
 | **BR-08** | No pueden existir dos solicitudes con el mismo `Id`. | §5 |
 | **BR-09** | `SaveAsync` persiste la solicitud tal como la recibe: no completa datos ni aplica reglas de negocio. | §7.1 RF-3 |
-| **BR-10** | Los estados válidos de una solicitud son `Received`, `Published` y `PublishFailed`. | §5, §9 |
+| **BR-10** | Los estados válidos son `Received`, `Published` y `PublishFailed`. El flujo es `Received` al guardar y luego `Published` o `PublishFailed` tras intentar publicar. | §5, §9, Feli (2026-11-02) |
 | **BR-11** | `UpdateStatusAsync` modifica únicamente el estado de una solicitud existente. | §7.1 RF-3 |
 | **BR-12** | Cada operación de escritura del repositorio guarda sus cambios por sí misma. | §7.1 RF-3 |
 | **BR-13** | `GetByIdAsync` devuelve `null` si la solicitud no existe. | §7.1 RF-3 |
@@ -49,6 +49,7 @@
 | **BR-19** | En el sobre del mensaje, `MessageId` y `CorrelationId` son iguales al `requestId`. | §7.2 RF-10 |
 | **BR-20** | El `requestId` es único y estable en reintentos: reenviar la misma solicitud nunca cambia su identificador. | §7.2 RF-11 |
 | **BR-21** | Si la publicación falla, el publisher lanza una excepción clara y no oculta el error. | §7.2 RF-12 |
+| **BR-21a** | Si falla la publicación, Application persiste `PublishFailed` y devuelve `AppError.Unavailable`. | Feli (2026-11-02) |
 
 ## 4. Consulta a Booking
 
@@ -103,9 +104,7 @@ Estas reglas todavía no están cerradas. Cuando se confirmen, pasan a las secci
 
 | ID | Regla propuesta | Con quién | Origen |
 |---|---|---|---|
-| **BR-P-01** | Flujo de estados: `Received` al guardar; `Published` o `PublishFailed` después de intentar publicar. | Feli | §11 |
 | **BR-P-02** | `UpdateStatusAsync` lanza una excepción si el `Id` no existe. | Feli | §11 |
-| **BR-P-03** | Si la publicación falla, la solicitud queda registrada como `PublishFailed` y la API informa el error al usuario. | Feli | §7.2 RF-12, §11 |
 | **BR-P-04** | Si Booking no responde, Application decide qué devolver; el cliente solo lanza la excepción. | Feli | §11 |
 | **BR-P-05** | `ReservationRequestedMessage` vive en Infrastructure (carpeta `Messaging`), por ser el contrato de transporte. | Feli | §11 |
 | **BR-P-06** | El sobre del mensaje puede llevar propiedades extra (como `Subject` con el tipo de evento) si Booking las necesita. | Gian | §11 |

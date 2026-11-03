@@ -301,17 +301,19 @@ dotnet ef migrations add InitialCreate \
 ### 6.1 Mensaje (cerrado con Gian)
 
 ```csharp
-// Availability.Infrastructure/Messaging/ReservationRequestedMessage.cs
-// Contrato de transporte con Booking. Sin correlationId aparte: el correlation id ES el requestId (BR-17).
+// contracts/events/ReservationRequestedMessage.cs
+// Contrato compartido con Booking. El correlation id se conserva en las propiedades del mensaje Service Bus.
 public sealed record ReservationRequestedMessage(
     Guid RequestId,
     Guid EventId,
     Guid SeatId,
     Guid UserId,
-    DateTimeOffset RequestedAt);
+    DateTimeOffset RequestedAt,
+    long AmountCents,
+    string Currency);
 ```
 
-La ubicación de este tipo en Infrastructure es una propuesta (BR-P-05).
+El tipo vive en el namespace `Booking.Business.Messages` y Infrastructure compila el archivo compartido desde `/contracts/events`. `RequestedAt` es `DateTimeOffset`; no hay un campo `correlationId` en el cuerpo. `AmountCents` y `Currency` se toman del evento asociado. `MessageId` y `CorrelationId` de Service Bus son el `RequestId` (BR-17, BR-19, BR-20).
 
 ### 6.2 Implementación
 
@@ -322,11 +324,13 @@ public class ServiceBusReservationPublisher : IReservationPublisher
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private readonly ServiceBusSender _sender; // thread-safe: se reutiliza, no se crea por mensaje
+    private readonly IEventRepository _events;
     private readonly ILogger<ServiceBusReservationPublisher> _logger;
 
-    public ServiceBusReservationPublisher(ServiceBusSender sender, ILogger<ServiceBusReservationPublisher> logger)
+    public ServiceBusReservationPublisher(ServiceBusSender sender, IEventRepository events, ILogger<ServiceBusReservationPublisher> logger)
     {
         _sender = sender;
+        _events = events;
         _logger = logger;
     }
 
@@ -335,10 +339,14 @@ public class ServiceBusReservationPublisher : IReservationPublisher
         using var scope = _logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = request.Id });
         _logger.LogInformation("PublishStarted request {RequestId}", request.Id);
 
-        // requestId = Id; requestedAt = CreatedAt (BR-18).
+        var eventDetails = await _events.GetByIdAsync(request.EventId, ct)
+            ?? throw new InvalidOperationException($"Event {request.EventId} was not found.");
+
+        // requestId = Id; requestedAt = CreatedAt (BR-18); importe y moneda pertenecen al evento.
         var body = new ReservationRequestedMessage(
             request.Id, request.EventId, request.SeatId, request.UserId,
-            new DateTimeOffset(DateTime.SpecifyKind(request.CreatedAt, DateTimeKind.Utc)));
+            new DateTimeOffset(DateTime.SpecifyKind(request.CreatedAt, DateTimeKind.Utc)),
+            eventDetails.PriceCents, eventDetails.Currency);
 
         var message = new ServiceBusMessage(BinaryData.FromObjectAsJson(body, Json))
         {
@@ -354,10 +362,10 @@ public class ServiceBusReservationPublisher : IReservationPublisher
             await _sender.SendMessageAsync(message, ct);
             _logger.LogInformation("PublishCompleted request {RequestId}", request.Id);
         }
-        catch (ServiceBusException ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "PublishFailed request {RequestId}", request.Id);
-            // BR-21: no se oculta el error. Application decide (BR-P-03).
+            // BR-21: no se oculta el error. Application persiste PublishFailed y devuelve AppError.Unavailable (BR-21a).
             throw new ExternalServiceUnavailableException("No se pudo publicar la solicitud en Azure Service Bus.", ex);
         }
     }
@@ -577,6 +585,7 @@ Nunca se registran secretos, tokens ni la connection string.
 | Situación | Comportamiento de Infrastructure | Regla |
 |---|---|---|
 | Falla el envío al broker | Lanza `ExternalServiceUnavailableException` | BR-21, BR-28 |
+| El publisher lanza `ExternalServiceUnavailableException` | Application persiste `PublishFailed` y devuelve `AppError.Unavailable` | Confirmado por Feli (2026-11-02) |
 | Booking responde `404` en el estado | Devuelve `null` | BR-27 |
 | Booking no responde o responde con error | Lanza `ExternalServiceUnavailableException` | BR-28 |
 | Solicitud inexistente en `GetByIdAsync` | Devuelve `null` | BR-13 |
@@ -674,9 +683,7 @@ Para el publisher y el cliente HTTP no hace falta ni el broker ni Booking: el cl
 
 | Regla | Con quién |
 |---|---|
-| BR-P-01 Flujo de estados: `Received`, luego `Published` o `PublishFailed` | Feli |
 | BR-P-02 `UpdateStatusAsync` si el `Id` no existe | Feli |
-| BR-P-03 Qué ocurre si falla la publicación | Feli |
 | BR-P-04 Qué hace Application si Booking no responde | Feli |
 | BR-P-05 Ubicación de `ReservationRequestedMessage` | Feli |
 | BR-P-06 Propiedades extra en el sobre del mensaje | Gian |
