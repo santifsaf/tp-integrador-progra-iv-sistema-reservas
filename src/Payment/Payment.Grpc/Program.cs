@@ -1,5 +1,6 @@
 using Payment.Grpc.Auditing;
 using Payment.Grpc.Security;
+using Payment.Grpc.Services;
 
 // PATRÓN (consigna 3c): Payment es N-Layer. Este proyecto es la capa de presentación
 // (gRPC): sólo configura el host, la seguridad y los interceptores. La lógica de cobro
@@ -29,8 +30,8 @@ app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok(new { service = "Payment", status = "ok" }))
     .AllowAnonymous();
 
-// PENDIENTE (Agus): el servicio concreto se mapea acá cuando esté PaymentGrpcService.
-// Al estar bajo el FallbackPolicy, queda autenticado y autorizado sólo para Booking.
-// app.MapGrpcService<PaymentGrpcService>();
+// Registrar el servicio gRPC de Payment.
+// La autenticación y autorización se aplican mediante la configuración de Kevin.
+app.MapGrpcService<PaymentGrpcService>();
 
 app.Run();
