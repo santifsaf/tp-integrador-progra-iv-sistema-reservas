@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Availability.Application.Abstractions;
 using Availability.Application.Common;
 using Availability.Domain.Entities;
@@ -17,11 +18,17 @@ public sealed class ServiceBusReservationPublisher(
 
     public async Task PublishAsync(ReservationRequest request, CancellationToken ct)
     {
+        var startTimestamp = Stopwatch.GetTimestamp();
         using var scope = logger.BeginScope(new Dictionary<string, object>
         {
             ["CorrelationId"] = request.Id
         });
-        logger.LogInformation("PublishStarted request {RequestId}", request.Id);
+        logger.LogInformation(
+            "Infrastructure operation {Event} {Operation} {CorrelationId} {RequestId}",
+            "Started",
+            "PublishReservation",
+            request.Id,
+            request.Id);
 
         try
         {
@@ -59,7 +66,13 @@ public sealed class ServiceBusReservationPublisher(
                     ex);
             }
 
-            logger.LogInformation("PublishCompleted request {RequestId}", request.Id);
+            logger.LogInformation(
+                "Infrastructure operation {Event} {Operation} {CorrelationId} {RequestId} {DurationMs}",
+                "Completed",
+                "PublishReservation",
+                request.Id,
+                request.Id,
+                Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds);
         }
         catch (OperationCanceledException)
         {
@@ -67,7 +80,14 @@ public sealed class ServiceBusReservationPublisher(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "PublishFailed request {RequestId}", request.Id);
+            logger.LogError(
+                ex,
+                "Infrastructure operation {Event} {Operation} {CorrelationId} {RequestId} {DurationMs}",
+                "Failed",
+                "PublishReservation",
+                request.Id,
+                request.Id,
+                Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds);
             throw;
         }
     }
