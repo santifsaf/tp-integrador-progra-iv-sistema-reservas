@@ -109,3 +109,27 @@ Formato de respuesta:
 
 # Prompt 4 correcciones:
 Faltó using Microsoft.EntityFrameworkCore en RejectedTests y ResolveTests. TryHoldAsync corre en un contexto que se descarta, mientras que AddRejectedAsync corre en otro nuevo. Así nunca se verifica que, tras el SeatOccupied, el mismo contexto pueda reinsertar el objeto mutado. Reescribilo con un solo contexto y repositorio. Bug en el test de la carrera. En un for, la variable i es una sola y se comparte entre las tareas. Como se ejecutan en el thread pool, varias pueden ver i == 10, y entonces el reparto mitad Confirmed y mitad Rejected no está garantizado. Además, las tareas no arrancan a la vez, así que la contención es débil. Usá un portón de salida y Enumerable.Range. Contextos sin liberar: fixture.CreateContext() se pasa sin await using en el segundo test de Rejected y en PassAsRejected y PassAsConfirmed. Declaralos con await using var en una línea aparte. Además: En el test 3 de Rejected, asertá que AddRejectedAsync devuelve true; hoy se ignora su resultado. En el test 2, ToListAsync() y filtrar en memoria es innecesario: CountAsync(r => r.RequestId == requestId) y Assert.Equal(1, ...). Sumale Assert.Empty(ctx.ChangeTracker.Entries()) para cubrir el descarte en el caso de fallo. Los mensajes de excepción (Contains("debe estar en estado Rejected")) atan el test al texto exacto. Es más robusto asertar ex.ParamName ("reservation" o "reason"). PassAsRejected... mezcla idiomas: renombralo a PasarARejected_LiberaElAsiento y PasarAConfirmed_MantieneLaOcupacion. DestinoInvalido solo prueba Held. Un [Theory] con Held y Expired cubre lo que pedía el prompt.
+
+
+# Prompt 5:
+
+Contexto: Sigo con la capa de datos de Booking (.NET 10, EF Core 10, Npgsql, PostgreSQL, xUnit 2.9.3). Tengo implementados y probados los demás métodos de ReservationRepository. Falta GetOccupiedSeatIdsAsync(Guid eventId, CancellationToken ct), que hoy lanza NotImplementedException. Lo consume la API de consulta, que cruza esos ids con el catálogo de asientos del servicio Availability. Podés consultar ReservationRepository.cs, IReservationRepository.cs, Reservation.cs, ReservationConfiguration.cs, TestData.cs y ReservationRepositoryExpireTests.cs (como referencia de estilo).
+Tarea: Implementá GetOccupiedSeatIdsAsync en ReservationRepository y escribí sus tests de integración.
+Comportamiento:
+•	Devuelve los SeatId DISTINTOS de las reservas de ese evento cuyo Status es Held o Confirmed. El filtro de estado tiene que ser exactamente ese, porque coincide con el predicado del índice parcial ux_reservations_active_seat y así Postgres puede usarlo.
+•	Si no hay ninguna, devuelve una lista vacía (nunca null).
+•	Solo lectura, sin tracking, y proyectando solo SeatId (no traer la entidad completa).
+•	No filtra por ExpiresAt: una Held vencida que el job todavía no procesó sigue contando como ocupada. Es una ventana de consistencia eventual aceptada; dejalo comentado.
+•	No lee el reloj, sin lógica de negocio, sin logging.
+Tests (xUnit, Assert, mismo estilo y fixture que el archivo de referencia; cada test empieza vaciando la tabla). Archivo ReservationRepositoryOccupiedSeatsTests.cs, con su propio helper SeedAsync que siembra con un contexto aparte y descartable:
+1.	Evento sin reservas: lista vacía.
+2.	Held y Confirmed del evento: aparecen sus asientos.
+3.	Rejected y Expired del evento: no aparecen.
+4.	Reservas Held de OTRO evento: no aparecen.
+5.	Un asiento con una Rejected y una Held: aparece una sola vez.
+6.	Held vencida (ExpiresAt en el pasado) que todavía no fue procesada: sigue apareciendo.
+Restricciones:
+•	Sin librerías nuevas ni mocking. No toques la fixture, las migraciones, TestData.cs ni los otros archivos de tests.
+•	Comentarios en español solo para decisiones no obvias.
+Formato de respuesta:
+1.	ReservationRepository.cs completo, 2) ReservationRepositoryOccupiedSeatsTests.cs, 3) una lista breve de supuestos y de casos que el código NO cubre.
