@@ -12,7 +12,11 @@ internal static class TestData
         Guid? seatId = null,
         DateTimeOffset? createdAt = null,
         DateTimeOffset? expiresAt = null,
-        DateTimeOffset? updatedAt = null)
+        DateTimeOffset? updatedAt = null,
+        long amountCents = 150_000,
+        string currency = "ARS")
+
+
     {
         var now = createdAt ?? DateTimeOffset.UtcNow;
         return new Reservation
@@ -26,6 +30,8 @@ internal static class TestData
             ExpiresAt = expiresAt ?? now.AddMinutes(2),
             CreatedAt = now,
             UpdatedAt = updatedAt ?? now,
+            AmountCents = amountCents,
+            Currency = currency,
         };
     }
 
@@ -37,7 +43,9 @@ internal static class TestData
         Guid? seatId = null,
         RejectionReason? reason = null,
         DateTimeOffset? createdAt = null,
-        DateTimeOffset? updatedAt = null)
+        DateTimeOffset? updatedAt = null,
+        long amountCents = 150_000,
+        string currency = "ARS")
     {
         var now = createdAt ?? DateTimeOffset.UtcNow;
         return new Reservation
@@ -52,6 +60,8 @@ internal static class TestData
             ExpiresAt = null,
             CreatedAt = now,
             UpdatedAt = updatedAt ?? now,
+            AmountCents = amountCents,
+            Currency = currency,
         };
     }
 }

@@ -138,4 +138,23 @@ public class ReservationRepositoryHoldTests
 
         Assert.Equal(HoldResult.Created, successResult);
     }
+
+    [Fact]
+    public async Task TryHoldAsync_PersisteImporteYMoneda()
+    {
+        await _fixture.ResetAsync();
+
+        // 3_000_000_123 supera int.MaxValue: comprueba que la columna es bigint.
+        var reservation = TestData.BuildHeldReservation(amountCents: 3_000_000_123, currency: "USD");
+
+        Assert.Equal(HoldResult.Created, await ExecuteTryHoldAsync(reservation));
+
+        await using var verifyContext = _fixture.CreateContext();
+        var persisted = await new ReservationRepository(verifyContext)
+            .GetByRequestIdAsync(reservation.RequestId, CancellationToken.None);
+
+        Assert.NotNull(persisted);
+        Assert.Equal(3_000_000_123, persisted.AmountCents);
+        Assert.Equal("USD", persisted.Currency);
+    }
 }
