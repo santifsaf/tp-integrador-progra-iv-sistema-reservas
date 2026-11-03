@@ -11,6 +11,8 @@ public sealed class SeatRepository(AvailabilityDbContext db) : ISeatRepository
         await db.Seats
             .AsNoTracking()
             .Where(x => x.EventId == eventId)
+            .OrderBy(x => x.Label)
+            .ThenBy(x => x.Id)
             .ToListAsync(ct);
 
     public Task<bool> ExistsAsync(Guid eventId, Guid seatId, CancellationToken ct) =>

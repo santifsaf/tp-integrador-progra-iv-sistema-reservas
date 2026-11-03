@@ -10,6 +10,8 @@ public sealed class EventRepository(AvailabilityDbContext db) : IEventRepository
     public async Task<IReadOnlyList<Event>> GetAllAsync(CancellationToken ct) =>
         await db.Events
             .AsNoTracking()
+            .OrderBy(x => x.StartsAt)
+            .ThenBy(x => x.Id)
             .ToListAsync(ct);
 
     public Task<Event?> GetByIdAsync(Guid eventId, CancellationToken ct) =>
