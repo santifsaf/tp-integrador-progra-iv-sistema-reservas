@@ -25,6 +25,10 @@ public static class DependencyInjection
         services.AddOptions<KeycloakOptions>()
             .Bind(configuration.GetSection("Keycloak"));
 
+        services.AddHttpContextAccessor();
+        services.AddTransient<CorrelationIdHandler>();
+        services.AddTransient<BookingAuthHandler>();
+
         services.AddDbContext<AvailabilityDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("AvailabilityDb")));
 
@@ -53,8 +57,22 @@ public static class DependencyInjection
 
         services.AddHttpClient(HttpClientNames.Keycloak);
         services.AddSingleton<KeycloakTokenProvider>();
-        services.AddTransient<BookingAuthHandler>();
+        services.AddHttpClient(HttpClientNames.Booking, (serviceProvider, client) =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<IOptions<BookingClientOptions>>()
+                    .Value;
+                client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+            })
+            .AddHttpMessageHandler<CorrelationIdHandler>()
+            .AddHttpMessageHandler<BookingAuthHandler>();
 
         return services;
     }
+}
+
+internal static class HttpClientNames
+{
+    public const string Keycloak = "Keycloak";
+    public const string Booking = "Booking";
 }
