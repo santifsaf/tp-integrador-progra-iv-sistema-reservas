@@ -97,23 +97,7 @@ public class ReservationsController : ControllerBase
             return BadRequest(errorResponse);
         }
 
-        // Validación: EventId y SeatId deben ser mayores a 0
-        if (request.EventId <= 0 || request.SeatId <= 0)
-        {
-            var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
-            _logger.LogWarning(
-                "Solicitud de reserva rechazada: IDs inválidos | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
-                request.EventId,
-                request.SeatId,
-                correlationId);
-            var errorResponse = new ErrorResponse(
-                "INVALID_IDS",
-                "EventId y SeatId deben ser mayores a 0",
-                correlationId);
-            return BadRequest(errorResponse);
-        }
-
-        // Extaer userId del JWT
+        // Extraer userId del JWT
         var userIdString = User.GetUserId();
         if (string.IsNullOrWhiteSpace(userIdString) || !Guid.TryParse(userIdString, out var userId))
         {
@@ -138,14 +122,10 @@ public class ReservationsController : ControllerBase
 
         try
         {
-            // NOTA: EventId y SeatId se pasan como int (IDs externos del cliente).
-            // La conversión a Guid interno ocurre en la capa Application/Infrastructure
-            // mediante GetByExternalIdAsync() en el repositorio (responsabilidad del equipo de Infrastructure).
-
             var result = await _createReservationRequestUseCase.ExecuteAsync(
                 userId,
-                request.EventId,      // int - ID externo del evento
-                request.SeatId,       // int - ID externo del asiento
+                request.EventId,
+                request.SeatId,
                 cancellationToken);
 
             // Manejar resultado fallido

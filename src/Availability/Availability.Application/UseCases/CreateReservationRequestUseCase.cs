@@ -23,21 +23,9 @@ public class CreateReservationRequestUseCase : ICreateReservationRequestUseCase
     }
 
     public async Task<Result<RequestReceivedDto>> ExecuteAsync(
-        Guid userId, int eventId, int seatId, CancellationToken ct)
+        Guid userId, Guid eventId, Guid seatId, CancellationToken ct)
     {
-        // NOTA IMPORTANTE (Responsabilidad de Infrastructure):
-        // Los parámetros eventId y seatId son IDs externos (int) del cliente.
-        // Estos deben convertirse a Guid internos usando:
-        // - IEventRepository.GetByExternalIdAsync(eventId, ct)
-        // - ISeatRepository.GetByExternalIdsAsync(eventId, seatId, ct)
-        // 
-        // Por ahora, usamos una conversión temporal. El equipo de Infrastructure
-        // debe reemplazar esto con la lógica real de mapeo.
-
-        var eventIdGuid = ConvertExternalEventIdToGuid(eventId);
-        var seatIdGuid = ConvertExternalSeatIdToGuid(seatId);
-
-        if (!await _seatRepository.ExistsAsync(eventIdGuid, seatIdGuid, ct))
+        if (!await _seatRepository.ExistsAsync(eventId, seatId, ct))
         {
             return Result<RequestReceivedDto>.Failure(AppError.NotFound);
         }
@@ -46,8 +34,8 @@ public class CreateReservationRequestUseCase : ICreateReservationRequestUseCase
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            EventId = eventIdGuid,
-            SeatId = seatIdGuid,
+            EventId = eventId,
+            SeatId = seatId,
             Status = RequestStatus.Received,
             CreatedAt = DateTime.UtcNow
         };
@@ -68,33 +56,5 @@ public class CreateReservationRequestUseCase : ICreateReservationRequestUseCase
 
         return Result<RequestReceivedDto>.Success(
             new RequestReceivedDto(request.Id, RequestStatus.Published.ToString()));
-    }
-
-    /// <summary>
-    /// Conversión temporal de ID externo (int) a Guid.
-    /// Esta es una implementación provisional. El equipo de Infrastructure debe
-    /// reemplazarla con GetByExternalIdAsync() en IEventRepository.
-    /// </summary>
-    private static Guid ConvertExternalEventIdToGuid(int eventId)
-    {
-        // TODO: Implementar GetByExternalIdAsync() en IEventRepository
-        var bytes = new byte[16];
-        BitConverter.GetBytes(1).CopyTo(bytes, 0);
-        BitConverter.GetBytes(eventId).CopyTo(bytes, 12);
-        return new Guid(bytes);
-    }
-
-    /// <summary>
-    /// Conversión temporal de ID externo (int) a Guid.
-    /// Esta es una implementación provisional. El equipo de Infrastructure debe
-    /// reemplazarla con GetByExternalIdsAsync() en ISeatRepository.
-    /// </summary>
-    private static Guid ConvertExternalSeatIdToGuid(int seatId)
-    {
-        // TODO: Implementar GetByExternalIdsAsync() en ISeatRepository
-        var bytes = new byte[16];
-        BitConverter.GetBytes(2).CopyTo(bytes, 0);
-        BitConverter.GetBytes(seatId).CopyTo(bytes, 12);
-        return new Guid(bytes);
     }
 }

@@ -30,41 +30,23 @@ public class SeatAvailabilityController : ControllerBase
     /// Incluye información del evento, contador de asientos totales y disponibles,
     /// así como la lista de asientos con su etiqueta (ej: "A1", "B2") y estado.
     /// </summary>
-    /// <param name="eventId">Identificador del evento (int)</param>
+    /// <param name="eventId">Identificador del evento (Guid)</param>
     /// <param name="cancellationToken">Token de cancelación</param>
     /// <returns>
     /// 200 OK: Mapa de asientos con información del evento y estado de cada asiento
-    /// 400 Bad Request: ID de evento inválido (debe ser mayor a 0)
     /// 404 Not Found: Evento no encontrado
     /// 503 Service Unavailable: Servicio de reservas no disponible
     /// </returns>
-    [HttpGet("{eventId:int}/seats")]
+    [HttpGet("{eventId:guid}/seats")]
     [ProducesResponseType(typeof(SeatMapDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<SeatMapDto>> GetSeatsAvailability(
-        [FromRoute] int eventId,
+        [FromRoute] Guid eventId,
         CancellationToken cancellationToken)
     {
         // Se declara una sola vez para todo el método
         var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
-
-        // Validación: eventId debe ser mayor a 0
-        if (eventId <= 0)
-        {
-            _logger.LogWarning(
-                "Solicitud de asientos rechazada: eventId inválido. EventId={EventId} | CorrelationId={CorrelationId}",
-                eventId,
-                correlationId);
-
-            var errorResponse = new ErrorResponse(
-                "INVALID_EVENT_ID",
-                "El ID del evento debe ser mayor a 0",
-                correlationId);
-
-            return BadRequest(errorResponse);
-        }
 
         _logger.LogInformation(
             "Consultando disponibilidad de asientos | EventId={EventId} | CorrelationId={CorrelationId}",

@@ -562,3 +562,23 @@ Problema 3: Manejo incompleto de UpdatedAt en ReservationRequest quiero que me h
 
  ```
  ### Resultado Entregado: code review 
+
+
+## Prompt 18: Code review
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante review de cambios
+**Objetivo:** code review de solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+decidimos que la API reciba Guid para eventId, seatId y cualquier otro ID con el que interactue y lo pase tal cual a la capa de aplicación.
+De esta forma evitaremos conversiones y validaciones de int (borra las validaciones de int). 
+Solo se valida que venga un Guid con formato válido con lo siguiente: {eventId:guid} en la ruta y Guid? + [Required] en el request 
+Efectuar los cambios.
+Devolver mapa completo en GetSeatsResponse.cs.
+En Availability.Api/appsettings.json cambiar "Audience": "availability", sino no coincide con el aud=availability que emite el realm de keycloak
+
+ ```
+ ### Resultado Entregado: Correcciones hechas.  
