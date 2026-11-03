@@ -3,9 +3,9 @@ namespace Payment.Business.Dtos
 {
     public class ChargeRequestDto
     {
-        public string reservationId { get; set; }
-        public string operationId { get; set; }
-        public Int64 amountCents { get; set; }
-        public string currency { get; set; }
+        public string ReservationId { get; set; } = string.Empty;
+        public string OperationId { get; set; } = string.Empty;
+        public Int64 AmountCents { get; set; }
+        public string Currency { get; set; } = string.Empty;
     }
 }

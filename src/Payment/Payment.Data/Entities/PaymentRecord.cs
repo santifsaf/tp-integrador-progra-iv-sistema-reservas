@@ -1,15 +1,16 @@
 ﻿
 namespace Payment.Data.Entities
 {
-    public record PaymentRecord
+    public class PaymentRecord
     {
         public Guid id { get; init; }
-        public string reservationId { get; set; }
-        public string OperationId { get; set; }
-        public Int64 amoutCents { get; set; }
-        public string currency { get; set; }
-        public PaymentStatus status { get; set; }
-        public string? failureReason { get; set; }
-
+        public string ReservationId { get; set; } = string.Empty;
+        public string OperationId { get; set; } = string.Empty;
+        public Int64 AmountCents { get; set; }
+        public string Currency { get; set; } = "ARG";
+        public PaymentStatus Status { get; set; }
+        public string? FailureReason { get; set; }
+        //public DateTime CreatedAt { get; set; } para logs y auditoria
+        //public DateTime? CompletedAt { get; set; }
     }
 }

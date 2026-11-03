@@ -5,8 +5,8 @@ namespace Payment.Business.Dtos
 {
     public class PaymentResultDto
     {
-        public string paymentId { get; set; }
-        public PaymentStatus status { get; set; }
-        public string? failureReason { get; set; }
+        public string PaymentId { get; set; } = string.Empty;
+        public PaymentStatus Status { get; set; }
+        public string? FailureReason { get; set; }
     }
 }
