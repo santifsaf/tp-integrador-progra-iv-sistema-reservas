@@ -8,6 +8,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 
 namespace Availability.Infrastructure;
@@ -44,7 +45,12 @@ public static class DependencyInjection
             var options = serviceProvider
                 .GetRequiredService<IOptions<ServiceBusOptions>>()
                 .Value;
-            return new ServiceBusClient(options.ConnectionString);
+            return new ServiceBusClient(
+                options.ConnectionString,
+                new ServiceBusClientOptions
+                {
+                    RetryOptions = new ServiceBusRetryOptions()
+                });
         });
         services.AddSingleton(serviceProvider =>
         {
@@ -56,17 +62,19 @@ public static class DependencyInjection
                 .CreateSender(options.TopicName);
         });
 
-        services.AddHttpClient(HttpClientNames.Keycloak);
+        services.AddHttpClient(HttpClientNames.Keycloak)
+            .AddStandardResilienceHandler();
         services.AddSingleton<KeycloakTokenProvider>();
-        services.AddHttpClient(HttpClientNames.Booking, (serviceProvider, client) =>
+        var bookingClient = services.AddHttpClient(HttpClientNames.Booking, (serviceProvider, client) =>
             {
                 var options = serviceProvider
                     .GetRequiredService<IOptions<BookingClientOptions>>()
                     .Value;
                 client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
-            })
-            .AddHttpMessageHandler<CorrelationIdHandler>()
-            .AddHttpMessageHandler<BookingAuthHandler>();
+            });
+        bookingClient.AddStandardResilienceHandler();
+        bookingClient.AddHttpMessageHandler<CorrelationIdHandler>();
+        bookingClient.AddHttpMessageHandler<BookingAuthHandler>();
 
         return services;
     }
