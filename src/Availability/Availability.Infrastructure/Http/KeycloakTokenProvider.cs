@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Availability.Infrastructure.Options;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Availability.Infrastructure.Http;
@@ -8,7 +10,8 @@ namespace Availability.Infrastructure.Http;
 internal sealed class KeycloakTokenProvider(
     IHttpClientFactory factory,
     IOptions<KeycloakOptions> options,
-    TimeProvider clock)
+    TimeProvider clock,
+    ILogger<KeycloakTokenProvider> logger)
 {
     private readonly KeycloakOptions _options = options.Value;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -22,6 +25,7 @@ internal sealed class KeycloakTokenProvider(
             return _token!;
         }
 
+        // Revalidar al adquirir el semÃ¡foro evita que llamadas concurrentes renueven el token varias veces.
         await _gate.WaitAsync(ct);
         try
         {
@@ -31,24 +35,54 @@ internal sealed class KeycloakTokenProvider(
             }
 
             var http = factory.CreateClient(HttpClientNames.Keycloak);
-            using var response = await http.PostAsync(
-                _options.TokenEndpoint,
-                new FormUrlEncodedContent(new Dictionary<string, string>
-                {
-                    ["grant_type"] = "client_credentials",
-                    ["client_id"] = _options.ClientId,
-                    ["client_secret"] = _options.ClientSecret
-                }),
-                ct);
+            var startTimestamp = Stopwatch.GetTimestamp();
+            logger.LogInformation(
+                "Keycloak token operation {Service} {Operation} {Event}",
+                "Availability",
+                "AcquireKeycloakToken",
+                "Started");
 
-            response.EnsureSuccessStatusCode();
+            int? statusCode = null;
+            try
+            {
+                using var response = await http.PostAsync(
+                    _options.TokenEndpoint,
+                    new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["grant_type"] = "client_credentials",
+                        ["client_id"] = _options.ClientId,
+                        ["client_secret"] = _options.ClientSecret
+                    }),
+                    ct);
+                statusCode = (int)response.StatusCode;
+                response.EnsureSuccessStatusCode();
 
-            var body = await response.Content.ReadFromJsonAsync<TokenResponse>(ct)
-                ?? throw new InvalidOperationException("La respuesta de token está vacía.");
+                var body = await response.Content.ReadFromJsonAsync<TokenResponse>(ct)
+                    ?? throw new InvalidOperationException("La respuesta de token estï¿½ vacï¿½a.");
 
-            _token = body.AccessToken;
-            _expiresAt = clock.GetUtcNow().AddSeconds(body.ExpiresIn);
-            return _token;
+                _token = body.AccessToken;
+                _expiresAt = clock.GetUtcNow().AddSeconds(body.ExpiresIn);
+                logger.LogInformation(
+                    "Keycloak token operation {Service} {Operation} {Event} {DurationMs} {StatusCode}",
+                    "Availability",
+                    "AcquireKeycloakToken",
+                    "Completed",
+                    Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds,
+                    statusCode);
+                return _token;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "Keycloak token operation {Service} {Operation} {Event} {DurationMs} {StatusCode}",
+                    "Availability",
+                    "AcquireKeycloakToken",
+                    "Failed",
+                    Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds,
+                    statusCode);
+                throw;
+            }
         }
         finally
         {
