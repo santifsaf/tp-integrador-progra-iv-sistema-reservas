@@ -30,7 +30,7 @@ Comunicación entre servicios:
   /Payment          ← N-Layer + gRPC
   /Notifications    ← Worker
 /contracts          ← .proto y contrato de mensajes del broker
-/infra              ← docker-compose y configuración de Keycloak
+/infra              ← docker-compose, configuración de Keycloak y bases de datos
 /docs               ← diagramas y tabla de interpretación
 /prompts            ← historial de prompts por integrante (Nombre_Apellido.md)
 ```
@@ -49,7 +49,7 @@ cp infra/.env.example infra/.env   # completar los valores pendientes
 docker compose -f infra/docker-compose.yml up -d
 ```
 
-Por ahora el docker compose levanta Keycloak en http://localhost:8081. Detalle de configuración, clients y cómo pedir un token: [`infra/README.md`](infra/README.md).
+Por ahora el docker compose levanta Keycloak en http://localhost:8081 y el Postgres de Booking en localhost:5432. Detalle de configuración, clients y cómo pedir un token: [`infra/README.md`](infra/README.md).
 
 ## Compilar y ejecutar en local
 
