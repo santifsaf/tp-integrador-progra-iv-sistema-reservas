@@ -161,4 +161,21 @@ public sealed class ReservationRepository(BookingDbContext context) : IReservati
 
         return null;
     }
+
+    public async Task<IReadOnlyList<Guid>> GetOccupiedSeatIdsAsync(Guid eventId, CancellationToken ct)
+    {
+        // Proyecta solo SeatId sin tracking. El filtro es Status IN (Held, Confirmed),
+        //el filtro replica los estados que ocupan un asiento; el índice parcial puede ayudar con volumen.
+        //
+        // No filtra por ExpiresAt: una Held vencida que el job de ExpireHeldAsync todavía
+        // no procesó sigue contando como ocupada. Es una ventana de consistencia eventual
+        // aceptada: entre que vence y que se procesa, aparecerá como ocupada.
+        return await context.Reservations
+            .AsNoTracking()
+            .Where(r => r.EventId == eventId && 
+                        (r.Status == ReservationStatus.Held || r.Status == ReservationStatus.Confirmed))
+            .Select(r => r.SeatId)
+            .Distinct()
+            .ToListAsync(ct);
+    }
 }
