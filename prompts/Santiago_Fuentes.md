@@ -76,6 +76,16 @@ Envia el token como metadata de autorizacion y propaga RequestId mediante x-corr
 - Soporte para deadline, timeout de autenticacion y cancelacion.
 - Generacion del cliente desde el contrato payment.proto aprobado.
 
+### Correcciones
+
+-Se corrigio la validacion de AmountCents para exigir un importe mayor que cero, de acuerdo con las restricciones del servidor Payment. Se agrego una prueba que comprueba que el importe cero se rechaza antes de solicitar el token o realizar una llamada gRPC.
+
+Archivos modificados:
+
+-GrpcPaymentGateway.cs: validación de importes mayores que cero.
+
+-GrpcPaymentGatewayTests.cs: prueba del rechazo de importes iguales a cero.
+
 ## Prompt 05
 
 Mapea las respuestas explicitas de Payment a los resultados existentes de Business. Los estados pendientes, desconocidos y errores de comunicacion deben producir Uncertain. Diferencia esos fallos de la cancelacion del solicitante, que debe propagarse.

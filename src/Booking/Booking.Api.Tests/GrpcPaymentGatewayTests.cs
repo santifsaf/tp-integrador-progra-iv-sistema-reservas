@@ -160,6 +160,7 @@ public sealed class GrpcPaymentGatewayTests
     [InlineData("reservationId")]
     [InlineData("operationId")]
     [InlineData("amount")]
+    [InlineData("zeroAmount")]
     [InlineData("currency")]
     public async Task InvalidCharge_IsRejectedBeforeAnyNetworkCall(string field)
     {
@@ -171,6 +172,7 @@ public sealed class GrpcPaymentGatewayTests
             "reservationId" => valid with { ReservationId = Guid.Empty },
             "operationId" => valid with { PaymentOperationId = Guid.Empty },
             "amount" => valid with { AmountCents = -1 },
+            "zeroAmount" => valid with { AmountCents = 0 },
             _ => valid with { Currency = "ars" },
         };
 

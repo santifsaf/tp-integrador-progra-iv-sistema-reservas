@@ -23,7 +23,7 @@ public sealed class GrpcPaymentGateway(
         RequireId(charge.RequestId, nameof(charge.RequestId));
         RequireId(charge.ReservationId, nameof(charge.ReservationId));
         RequireId(charge.PaymentOperationId, nameof(charge.PaymentOperationId));
-        ArgumentOutOfRangeException.ThrowIfNegative(charge.AmountCents);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(charge.AmountCents);
         if (charge.Currency is not { Length: 3 } || charge.Currency.Any(c => c is < 'A' or > 'Z'))
             throw new ArgumentException("Currency debe tener tres letras mayúsculas, por ejemplo ARS.", nameof(charge));
 
