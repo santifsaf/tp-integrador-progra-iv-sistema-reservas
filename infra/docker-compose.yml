@@ -1,6 +1,22 @@
 name: seat-reservation
 
 services:
+  availability-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${AVAILABILITY_DB_NAME}
+      POSTGRES_USER: ${AVAILABILITY_DB_USER}
+      POSTGRES_PASSWORD: ${AVAILABILITY_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - availability-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.4
     command: start-dev --import-realm
@@ -32,3 +48,6 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
+
+volumes:
+  availability-db-data:
