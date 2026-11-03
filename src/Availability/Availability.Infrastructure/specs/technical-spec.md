@@ -388,8 +388,8 @@ services.AddSingleton(sp =>
     var o = sp.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
     return new ServiceBusClient(o.ConnectionString, new ServiceBusClientOptions
     {
-        // Reintentos del SDK: ver sección 8. Valores pendientes.
-        RetryOptions = new ServiceBusRetryOptions { Mode = ServiceBusRetryMode.Exponential /* MaxRetries, Delay, MaxDelay, TryTimeout */ }
+        // El SDK usa sus valores predeterminados; no se agrega una política paralela de Polly.
+        RetryOptions = new ServiceBusRetryOptions()
     });
 });
 services.AddSingleton(sp =>
@@ -493,27 +493,28 @@ Un `404` en la consulta de estado se interpreta como `null` (BR-27): Booking tod
 
 ### 8.1 Cliente HTTP (propuesta técnica)
 
-`Microsoft.Extensions.Http.Resilience` incluye `AddStandardResilienceHandler()`, un conjunto de políticas basado en Polly (timeout total, reintentos con espera creciente, timeout por intento y corte de circuito). Se parte de sus valores por defecto y se ajustan por configuración. Los valores definitivos están pendientes.
+`Microsoft.Extensions.Http.Resilience` incluye `AddStandardResilienceHandler()`, un conjunto de políticas basado en Polly (timeout total, reintentos con espera creciente, timeout por intento y corte de circuito). **Acuerdo del grupo (2026-11-03):** se usan los valores predeterminados de la versión referenciada, sin personalizaciones. La política estándar considera respuestas transitorias; no reintenta `404`, que en la consulta de estado significa que la solicitud todavía no está procesada.
 
 El orden de registro define el orden de la cadena de handlers: el primero registrado es el más externo. La resiliencia va primero para que **cada reintento tome el token vigente** del handler de autenticación.
 
 ```csharp
-var booking = services.AddHttpClient<IBookingClient, BookingClient>((sp, client) =>
+var bookingClient = services.AddHttpClient(HttpClientNames.Booking, (sp, client) =>
 {
     client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<BookingClientOptions>>().Value.BaseUrl);
 });
-booking.AddStandardResilienceHandler();            // externo: timeouts y reintentos
-booking.AddHttpMessageHandler<BookingAuthHandler>(); // interno: token en cada intento
+bookingClient.AddStandardResilienceHandler();     // valores predeterminados; registrado antes de los handlers delegantes
+bookingClient.AddHttpMessageHandler<CorrelationIdHandler>();
+bookingClient.AddHttpMessageHandler<BookingAuthHandler>();
 
-// El pedido de token a Keycloak también lleva timeouts y reintentos.
+// El pedido de token a Keycloak también lleva la política estándar predeterminada.
 services.AddHttpClient(HttpClientNames.Keycloak).AddStandardResilienceHandler();
 ```
 
-Los reintentos son seguros porque las dos operaciones del cliente son consultas (`GET`): repetirlas no cambia nada en Booking.
+La resiliencia HTTP se instala antes de los handlers delegantes para que cada reintento vuelva a pasar por autenticación y correlación. Los `GET` a Booking son seguros para reintentar; el `404` no es transitorio y no se reintenta.
 
-### 8.2 Publisher (propuesta técnica, a confirmar)
+### 8.2 Publisher
 
-El SDK de Azure Service Bus ya trae su propia política de reintentos (`ServiceBusRetryOptions`: modo, cantidad máxima, espera y timeout por intento). Si además se envolviera el envío con Polly, los reintentos se multiplicarían (reintentos del SDK × reintentos de Polly). Por eso la propuesta es **usar `ServiceBusRetryOptions` del SDK** y no agregar Polly en el publisher. Si el equipo prefiere Polly, se desactivan los reintentos del SDK para no duplicarlos.
+**Acuerdo del grupo (2026-11-03):** el envío usa exclusivamente los reintentos nativos del SDK de Azure Service Bus mediante `ServiceBusRetryOptions` con sus valores predeterminados; no se agrega Polly ni otra capa de reintentos.
 
 **Consecuencia a tener presente.** Un reintento puede producir un mensaje duplicado: el envío llegó al broker, pero la confirmación se perdió. Se cubre con el `MessageId` y `CorrelationId` iguales al `requestId` (BR-19, BR-20) y con la idempotencia de Booking por `requestId`.
 
@@ -638,8 +639,6 @@ Para el publisher y el cliente HTTP no hace falta ni el broker ni Booking: el cl
 | Pendiente | Con quién |
 |---|---|
 | Framework de pruebas y estrategia para repositorios | Grupo |
-| Valores de timeouts y reintentos (cliente HTTP y publisher) | Grupo |
-| Confirmar que el publisher usa los reintentos del SDK y no Polly | Grupo |
 | Datos del seed: cuántos eventos y asientos, y sus GUID | Rebeca |
 | Qué `correlationId` usar en consultas sin `requestId` (listado de asientos y ocupación) | Felipe / Feli |
 

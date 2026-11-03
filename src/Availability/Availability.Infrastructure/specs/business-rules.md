@@ -104,6 +104,8 @@
 | **BR-42** | `GetByUserIdAsync` ordena por `CreatedAt` descendente; `EventRepository.GetAllAsync` por `StartsAt` ascendente; y `SeatRepository.GetByEventAsync` por `Label` ascendente. En los tres casos, `Id` ascendente desempata para garantizar un orden estable. | Decisión de Rebeca conversada con Feli (2026-11-03) |
 | **BR-43** | Los logs estructurados usan Serilog con los campos `Service`, `Operation`, `Event` y `CorrelationId`; incluyen duración, status HTTP y excepción cuando corresponda. No registran secretos, tokens, connection strings ni payloads sensibles. | Decisión aceptada (2026-11-03) |
 | **BR-44** | Las llamadas a Booking usan `X-Correlation-ID`: `requestId` para operaciones de reserva y el ID recibido o generado por el middleware HTTP para consultas sin `requestId`. | Decisiones aceptadas (2026-11-03) |
+| **BR-46** | Los clientes HTTP de Booking y Keycloak usan `AddStandardResilienceHandler()` con los valores predeterminados de la versión referenciada; la consulta de estado no reintenta `404`, que representa una reserva aún no procesada. | Acuerdo del grupo (2026-11-03), U-17 |
+| **BR-47** | El publisher usa únicamente los reintentos predeterminados del SDK de Azure Service Bus (`ServiceBusRetryOptions`), sin Polly ni una segunda política en la aplicación. | Acuerdo del grupo (2026-11-03), U-18 |
 
 ---
 

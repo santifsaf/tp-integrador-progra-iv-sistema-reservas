@@ -80,7 +80,7 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 | **U-03** | **Resuelto (2026-11-03, decisión de implementación):** `UpdateStatusAsync` lanza `KeyNotFoundException` si el `Id` no existe (BR-11). | Rebeca | T1.7 |
 | **U-04** | **Resuelto (2026-11-03, decisión de Rebeca conversada con Feli):** solicitudes por `CreatedAt` descendente; eventos por `StartsAt` ascendente; asientos por `Label` ascendente. En cada lista, `Id` ascendente desempata para mantener un orden estable (BR-42). | Rebeca / Feli | T1.9 |
 | **U-05** | **Resuelto:** el mensaje incluye `AmountCents` y `Currency`, no agrega `correlationId` al cuerpo y `RequestedAt` es `DateTimeOffset` (BR-P-06, BR-P-07). | Gian | T3.5, T3.6 |
-| **U-06** | **Resuelto (2026-11-02):** se verificó desde una aplicación de consola externa que la suscripción `booking` existe en el topic `grupo5-booking-topic`. 
+| **U-06** | **Resuelto (2026-11-02)** se verificó desde una aplicación de consola externa que la suscripción `booking` existe en el topic `grupo5-booking-topic`. 
 | **U-07** | **Resuelto (2026-11-03, verificado en la implementación compartida de Booking):** `200` devuelve `{ "status", "description" }`; `404` significa que Booking todavía no tiene una reserva para el `requestId`. Availability interpreta ese `404` como pendiente si la solicitud existe localmente. | Booking API | T4.7 |
 | **U-08** | **Resuelto (2026-11-03):** estandarizar el header saliente como `X-Correlation-ID`. Las consultas de reserva usan `requestId`; otras consultas propagan el ID HTTP. | Santi / Rebeca | T4.8 |
 | **U-09** | **Acordado e implementado parcialmente (2026-11-03):** PostgreSQL 16 como `availability-db`, puerto host `5433` → contenedor `5432`, variables `AVAILABILITY_DB_NAME`, `AVAILABILITY_DB_USER`, `AVAILABILITY_DB_PASSWORD` y healthcheck `pg_isready`. La API no está en el compose, por lo que su `depends_on: condition: service_healthy` sigue pendiente de integración. | Felipe / Rebeca | T1.11, T2.4, T2.5 |
@@ -91,8 +91,8 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 | **U-14** | **Decisión confirmada (2026-11-03):** usar `requestId` en operaciones de reserva y el ID del middleware HTTP en consultas sin `requestId`; propagarlo a Booking como `X-Correlation-ID`. El cliente de Infrastructure fija `requestId` en la consulta de estado y el handler propaga el ID HTTP para otras consultas. | Felipe / Feli / Luciana | T5.6 |
 | **U-15** | Proyecto Api con el paquete `Microsoft.EntityFrameworkCore.Design` y un `Program.cs` que llame a `AddInfrastructure` y `ApplyMigrationsAsync`; coordinar además la configuración y el servicio API en Compose con Felipe. | Luciana / Felipe | T1.10, T2.3, T2.5, integración de U-09/U-11 |
 | **U-16** | Framework de pruebas y estrategia para los repositorios (PostgreSQL real o base en memoria). | Grupo | T6.1 y todas las pruebas de F6 |
-| **U-17** | Valores de timeouts y reintentos del cliente HTTP y del publisher. | Grupo | T5.1, T5.3, T5.4 |
-| **U-18** | Si el publisher usa los reintentos del SDK de Service Bus o Polly. | Grupo | T5.2, T5.4 |
+| **U-17** | **Resuelto (2026-11-03):** usar los valores por defecto de `Microsoft.Extensions.Http.Resilience` para los clientes HTTP y del SDK de Service Bus para publicaciones; no definir valores personalizados. | Grupo | T5.1, T5.3, T5.4 |
+| **U-18** | **Resuelto (2026-11-03):** Service Bus usa solo los reintentos nativos del SDK; no agregar Polly ni una segunda política de reintentos al publisher. | Grupo | T5.2, T5.4 |
 | **U-19** | Ubicación y formato del historial de prompts (el reparto indica `/prompts` con `Nombre_Apellido.md` y la guía `prompts/Nombre_Apellido/`) y de la carpeta de decisiones. | Grupo / Felipe | T7.2, T7.3 |
 | **U-20** | Quién del subgrupo arma el diagrama de Availability, la marca de consistencia eventual y la tabla de interpretación. | Subgrupo | T7.4 |
 | **U-21** | **Resuelto (2026-11-03):** se verificó que `feat/availability` existe y que Domain y Application tienen las entidades e interfaces acordadas con Feli. | Rebeca / Feli | T0.1 |
@@ -102,8 +102,8 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 Ordenados por cuántas tareas destraban:
 
 1. **U-15 (Luciana):** destraba la migración inicial y el arranque.
-2. **U-17/U-18 (grupo):** definir timeouts y reintentos del cliente HTTP y del publisher.
-3. **U-16, U-17 y U-18 (Grupo)** pueden esperar a las fases finales.
+2. **U-16 (grupo):** definir framework y estrategia de pruebas para habilitar F6.
+3. **U-19/U-20 (grupo):** acordar ubicación de documentación y responsables del diagrama para cerrar F7.
 
 ---
 
@@ -223,10 +223,10 @@ Ordenados por cuántas tareas destraban:
 
 | ID | Tarea | Depende de | Estado | Provisorio posible |
 |---|---|---|---|---|
-| **T5.1** | Definir los valores de timeouts y reintentos del cliente HTTP y del publisher. | U-17 | **Bloqueada (U-17)** | Valores por defecto de `AddStandardResilienceHandler` y del SDK de Service Bus |
-| **T5.2** | Confirmar si el publisher usa los reintentos del SDK o Polly. | U-18 | **Bloqueada (U-18)** | `ServiceBusRetryOptions` del SDK, sin Polly, para no multiplicar los reintentos (spec §8.2) |
-| **T5.3** | Agregar `AddStandardResilienceHandler()` al `BookingClient` y al `HttpClient` de Keycloak, **registrado antes** del handler de token para que cada reintento use el token vigente. | F4, T5.1 | **Bloqueada (U-17)** | Valores por defecto |
-| **T5.4** | Configurar `ServiceBusRetryOptions` en el `ServiceBusClient`. | F3, T5.1, T5.2 | **Bloqueada (U-17, U-18)** | Valores por defecto del SDK |
+| **T5.1** | Definir los valores de timeouts y reintentos del cliente HTTP y del publisher. | U-17 | **Resuelta (2026-11-03):** se aceptan los valores por defecto de las librerías. | — |
+| **T5.2** | Confirmar si el publisher usa los reintentos del SDK o Polly. | U-18 | **Resuelta (2026-11-03):** solo reintentos nativos de Azure Service Bus, sin Polly. | — |
+| **T5.3** | Agregar `AddStandardResilienceHandler()` al `BookingClient` y al `HttpClient` de Keycloak, **registrado antes** del handler de token para que cada reintento consulte el token vigente. | F4, T5.1 | **Implementada (2026-11-03)** | — |
+| **T5.4** | Configurar `ServiceBusRetryOptions` en el `ServiceBusClient`. | F3, T5.1, T5.2 | **Implementada (2026-11-03):** opciones del SDK explícitas, sin personalizar sus valores por defecto y sin Polly. | — |
 | **T5.5** | Aplicar la convención de logs acordada: Serilog estructurado con `Service`, `Operation`, `Event`, `CorrelationId`, duración, status HTTP y excepción según corresponda. | U-13 | **Parcial: publisher, repositorios, BookingClient y adquisición de token emiten eventos estructurados; falta configurar la salida y el middleware en API (Luciana)** | — |
 | **T5.6** | Propagar la correlación HTTP de consultas sin `requestId` a Booking con `X-Correlation-ID`; las consultas de reserva usan `requestId`. | U-14 | **Implementada en Infrastructure; requiere el middleware HTTP de API para consultas sin `requestId`** | — |
 | **T5.7** | Logs `Started`, `Completed` y `Failed` correlacionados en las operaciones de Infrastructure y en el pipeline HTTP; nunca registrar secretos, tokens ni connection strings. | F1, F3, F4 | **Parcial: Infrastructure registra eventos; falta el pipeline HTTP de API (Luciana)** | — |
@@ -293,13 +293,13 @@ Pruebas a escribir una vez resuelta T6.1:
 | F2 | 5 | 2 | 0 | 3 |
 | F3 | 10 | 9 | 0 | 1 |
 | F4 | 11 | 7 | 0 | 4 |
-| F5 | 7 | 0 | 3 | 4 |
+| F5 | 7 | 4 | 3 | 0 |
 | F6 | 10 | 0 | 0 | 10 |
 | F7 | 6 | 0 | 1 | 5 |
-| **Total** | **67** | **32** | **6** | **29** |
+| **Total** | **67** | **36** | **6** | **25** |
 
 **Criterio del resumen:** "Parciales" incluye tareas con una parte externa o de integración todavía pendiente; "Pendientes o bloqueadas" incluye las dependientes de decisiones, responsables externos, servicios reales o cierre de fases. T0.6 y T1.1 quedan parciales hasta compartir la configuración y los GUID del seed, respectivamente. T3.7 se confirmó mergeada en `origin/develop`.
 
-**Desbloqueos recientes:** U-03 permitió completar T1.7, U-04 T1.9 y U-07 T4.7; T4.6–T4.9 y T4.11 también están implementadas. U-08 a U-14 tienen decisiones confirmadas. De U-09 solo está implementado el contenedor de base; la API aún no está en Compose, por lo que siguen pendientes `depends_on` y el mapeo del secreto U-11. Las direcciones acordadas para U-10/U-12 tampoco están configuradas en la API. La revisión confirmó que [Availability.Api.csproj](../../Availability.Api/Availability.Api.csproj) aún no referencia `Microsoft.EntityFrameworkCore.Design` y [Program.cs](../../Availability.Api/Program.cs) todavía no llama a `AddInfrastructure` ni a `ApplyMigrationsAsync`. Por responsabilidad de Luciana, no se modificaron archivos de `Availability.Api` ni su `.csproj`. T1.10 continúa bloqueada hasta coordinar U-15.
+**Desbloqueos recientes:** U-03 permitió completar T1.7, U-04 T1.9, U-07 T4.7 y U-17/U-18 T5.1–T5.4. T4.6–T4.9 y T4.11 también están implementadas. U-08 a U-14 tienen decisiones confirmadas. De U-09 solo está implementado el contenedor de base; la API aún no está en Compose, por lo que siguen pendientes `depends_on` y el mapeo del secreto U-11. Las direcciones acordadas para U-10/U-12 tampoco están configuradas en la API. La revisión confirmó que [Availability.Api.csproj](../../Availability.Api/Availability.Api.csproj) aún no referencia `Microsoft.EntityFrameworkCore.Design` y [Program.cs](../../Availability.Api/Program.cs) todavía no llama a `AddInfrastructure` ni a `ApplyMigrationsAsync`. Por responsabilidad de Luciana, no se modificaron archivos de `Availability.Api` ni su `.csproj`. T1.10 continúa bloqueada hasta coordinar U-15.
 
-**Por dónde continuar ya mismo:** coordinar con Luciana U-15 (`AddInfrastructure`, `ApplyMigrationsAsync` y `Microsoft.EntityFrameworkCore.Design`) y con ella/Felipe el servicio API en Compose, `depends_on: condition: service_healthy` y las variables acordadas. Cuando eso esté integrado, generar/verificar la migración (T1.10/T1.11) y probar `BookingClient` contra servicios reales (T4.10). Para F5, el grupo debe resolver U-17/U-18 antes de configurar reintentos y timeouts. T3.9 requiere autorización y acceso para publicar en Service Bus; F6 requiere resolver U-16; F7 sigue sujeto a U-19/U-20 y al cierre de fases.
+**Por dónde continuar ya mismo:** coordinar con Luciana U-15 (`AddInfrastructure`, `ApplyMigrationsAsync` y `Microsoft.EntityFrameworkCore.Design`) y con ella/Felipe el servicio API en Compose, `depends_on: condition: service_healthy` y las variables acordadas. Cuando eso esté integrado, generar/verificar la migración (T1.10/T1.11) y probar `BookingClient` contra servicios reales (T4.10). T3.9 requiere autorización y acceso para publicar en Service Bus; F6 requiere resolver U-16; F7 sigue sujeto a U-19/U-20 y al cierre de fases.
