@@ -1,3 +1,4 @@
+using Booking.Business.Payments;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using SeatReservation.Contracts.Payment;
@@ -29,6 +30,7 @@ public static class DependencyInjection
             client.Address = new Uri(sp.GetRequiredService<IOptions<PaymentClientOptions>>().Value.Address))
             .ConfigureChannel(channel => channel.ThrowOperationCanceledOnCancellation = true);
         services.AddTransient<GrpcPaymentGateway>();
+        services.AddTransient<IPaymentClient, ReservationPaymentClient>();
         return services;
     }
 

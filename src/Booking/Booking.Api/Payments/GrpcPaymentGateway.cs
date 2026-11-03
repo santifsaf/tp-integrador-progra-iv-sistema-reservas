@@ -5,9 +5,9 @@ using SeatReservation.Contracts.Payment;
 
 namespace Booking.Api.Payments;
 
-// Adapter/Gateway: concentra el protocolo y traduce las respuestas de Payment
-// al PaymentResult existente en Business. Todavía no implementa IPaymentClient:
-// esa interfaz recibe una Reservation que no contiene importe ni moneda.
+// Gateway: concentra el protocolo y traduce las respuestas de Payment al
+// PaymentResult existente en Business. ReservationPaymentClient adapta la entidad
+// de negocio a los datos explícitos que recibe este componente.
 public sealed class GrpcPaymentGateway(
     PaymentService.PaymentServiceClient client,
     PaymentTokenProvider tokens,
