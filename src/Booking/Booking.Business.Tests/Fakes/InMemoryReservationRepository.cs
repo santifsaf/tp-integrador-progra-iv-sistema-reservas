@@ -42,6 +42,18 @@ internal sealed class InMemoryReservationRepository : IReservationRepository
         }
     }
 
+    public Task<IReadOnlyList<Guid>> GetOccupiedSeatIdsAsync(Guid eventId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        lock (_lock)
+        {
+            return Task.FromResult<IReadOnlyList<Guid>>(_reservations
+                .Where(r => r.EventId == eventId
+                            && r.Status is ReservationStatus.Held or ReservationStatus.Confirmed)
+                .Select(r => r.SeatId).Distinct().ToArray());
+        }
+    }
+
     public Task<HoldResult> TryHoldAsync(Reservation reservation, CancellationToken ct)
     {
         lock (_lock)

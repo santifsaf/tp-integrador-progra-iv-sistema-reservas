@@ -38,6 +38,11 @@ public interface IReservationRepository
     // Devuelve la reserva generada por esa solicitud, o null si todavía no existe.
     Task<Reservation?> GetByRequestIdAsync(Guid requestId, CancellationToken ct);
 
+    // IDs únicos de asientos con una reserva Held o Confirmed para el evento.
+    // Usa el estado persistido, sin ejecutar vencimientos ni consultar el catálogo
+    // de otro servicio. Sin reservas activas devuelve una colección vacía.
+    Task<IReadOnlyList<Guid>> GetOccupiedSeatIdsAsync(Guid eventId, CancellationToken ct);
+
     // Inserta una reserva en estado Held.
     //   - Created:          se insertó.
     //   - SeatOccupied:     violó ux_reservations_active_seat.

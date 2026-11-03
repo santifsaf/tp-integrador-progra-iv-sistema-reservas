@@ -6,8 +6,15 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.21.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
+    <PackageReference Include="Google.Protobuf" Version="3.30.2" />
+    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.71.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.71.0" PrivateAssets="All" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Booking.Business/Booking.Business.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="../../../contracts/proto/payment.proto" GrpcServices="Client" />
   </ItemGroup>
 </Project>
