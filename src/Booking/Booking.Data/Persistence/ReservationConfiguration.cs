@@ -38,6 +38,11 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
             .HasColumnName("seat_id")
             .IsRequired();
 
+        builder.Property(r => r.AmountCents).HasColumnName("amount_cents").IsRequired();
+
+        // ISO 4217 de tres letras (ARS, USD); el cliente de Payment ya valida ese formato.
+        builder.Property(r => r.Currency).HasColumnName("currency").HasMaxLength(3).IsRequired();
+
         // Enums como texto
         builder.Property(r => r.Status)
             .HasColumnName("status")
