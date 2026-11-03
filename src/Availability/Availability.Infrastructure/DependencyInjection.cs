@@ -1,5 +1,6 @@
 using Availability.Application.Abstractions;
 using Availability.Infrastructure.Http;
+using Availability.Infrastructure.Messaging;
 using Availability.Infrastructure.Options;
 using Availability.Infrastructure.Persistence;
 using Availability.Infrastructure.Repositories;
@@ -30,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IReservationRequestRepository, ReservationRequestRepository>();
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<ISeatRepository, SeatRepository>();
+        services.AddScoped<IReservationPublisher, ServiceBusReservationPublisher>();
         services.AddSingleton(TimeProvider.System);
 
         services.AddSingleton(serviceProvider =>
