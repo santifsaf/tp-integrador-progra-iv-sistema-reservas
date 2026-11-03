@@ -23,6 +23,12 @@ public class Reservation
 
     public Guid SeatId { get; set; }
 
+    // Datos del cobro de la solicitud original: los reintentos deben conservar
+    // el importe en centavos y la moneda, aunque luego cambie el precio del evento.
+    public long AmountCents { get; set; }
+
+    public string Currency { get; set; } = string.Empty;
+
     public ReservationStatus Status { get; set; }
 
     // Solo tiene valor cuando Status == Rejected.

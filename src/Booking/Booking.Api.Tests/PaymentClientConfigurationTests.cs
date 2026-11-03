@@ -1,4 +1,5 @@
 using Booking.Api.Payments;
+using Booking.Business.Payments;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -9,7 +10,7 @@ namespace Booking.Api.Tests;
 public sealed class PaymentClientConfigurationTests
 {
     [Fact]
-    public void Gateway_ResolvesWithoutContactingPaymentOrKeycloak()
+    public void PaymentClients_ResolveWithoutContactingPaymentOrKeycloak()
     {
         var services = Services();
         HttpClient? tokenClient = null;
@@ -19,6 +20,7 @@ public sealed class PaymentClientConfigurationTests
         using var provider = services.BuildServiceProvider();
 
         Assert.NotNull(provider.GetRequiredService<GrpcPaymentGateway>());
+        Assert.IsType<ReservationPaymentClient>(provider.GetRequiredService<IPaymentClient>());
         Assert.NotNull(tokenClient);
         Assert.Equal(TimeSpan.FromSeconds(7), tokenClient.Timeout);
     }
@@ -38,6 +40,10 @@ public sealed class PaymentClientConfigurationTests
 
         Assert.Contains($"Payment:{key}", error.Message);
         Assert.DoesNotContain("test-secret", error.Message);
+
+        var clientError = Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IPaymentClient>());
+        Assert.Contains($"Payment:{key}", clientError.Message);
+        Assert.DoesNotContain("test-secret", clientError.Message);
     }
 
     private static IServiceCollection Services(string? key = null, string? value = null)
