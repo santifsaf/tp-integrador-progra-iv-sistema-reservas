@@ -41,6 +41,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Booking.Demo", "src\Booking
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Booking.Api.Tests", "src\Booking\Booking.Api.Tests\Booking.Api.Tests.csproj", "{5CC80AA7-B83B-4C95-A203-98EE2DACCB91}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Booking.Data.Tests", "src\Booking\Booking.Data.Tests\Booking.Data.Tests.csproj", "{D1894076-D8BC-4F98-8D08-70EB545FAEBE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -219,6 +221,18 @@ Global
 		{5CC80AA7-B83B-4C95-A203-98EE2DACCB91}.Release|x64.Build.0 = Release|Any CPU
 		{5CC80AA7-B83B-4C95-A203-98EE2DACCB91}.Release|x86.ActiveCfg = Release|Any CPU
 		{5CC80AA7-B83B-4C95-A203-98EE2DACCB91}.Release|x86.Build.0 = Release|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Debug|x64.Build.0 = Debug|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Debug|x86.Build.0 = Debug|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|x64.ActiveCfg = Release|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|x64.Build.0 = Release|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|x86.ActiveCfg = Release|Any CPU
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -242,5 +256,6 @@ Global
 		{96E2B1B9-ED1B-4E8F-A23D-D6A2D06DC920} = {0D93AE7C-F497-2789-51B0-0BCB8A028FCE}
 		{EAB9E010-0897-4CA8-963A-E46320BFED6A} = {0D93AE7C-F497-2789-51B0-0BCB8A028FCE}
 		{5CC80AA7-B83B-4C95-A203-98EE2DACCB91} = {0D93AE7C-F497-2789-51B0-0BCB8A028FCE}
+		{D1894076-D8BC-4F98-8D08-70EB545FAEBE} = {0D93AE7C-F497-2789-51B0-0BCB8A028FCE}
 	EndGlobalSection
 EndGlobal

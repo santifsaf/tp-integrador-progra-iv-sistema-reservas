@@ -3,6 +3,7 @@ using Booking.Api.Payments;
 using Booking.Api.Security;
 using Booking.Business.Queries;
 using Booking.Data;
+using Booking.Data.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -12,9 +13,23 @@ builder.Services.AddExceptionHandler<BookingExceptionHandler>();
 builder.Services.AddBookingAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddPaymentCommunication(builder.Configuration);
 
-// Composition root: aquí se registrará IReservationRepository con su implementación
-// EF. La factory permite arrancar /health mientras falta esa integración y devuelve
-// un 503 explícito al consultar, sin introducir un repositorio ficticio en la API.
+
+var bookingConnectionString = builder.Configuration.GetConnectionString("Booking");
+if (!string.IsNullOrWhiteSpace(bookingConnectionString))
+{
+    builder.Services.AddBookingData(bookingConnectionString);
+}
+else if (!builder.Environment.IsEnvironment("Testing"))
+{
+    // Fallar al arrancar es mejor que responder 503 en producción sin saber por qué.
+    throw new InvalidOperationException("Falta la connection string 'ConnectionStrings:Booking'.");
+}
+
+// Composition root: IReservationRepository se registra arriba con AddBookingData cuando hay
+// connection string. Estas factories se mantienen como red de seguridad: si el repositorio no
+// está registrado (por ejemplo en las pruebas de la API, entorno Testing), /health igual
+// arranca y las consultas devuelven un 503 explícito, sin introducir un repositorio ficticio.
+
 builder.Services.AddScoped(sp => new ReservationStatusQueryService(
     sp.GetService<IReservationRepository>() ?? throw new ReservationRepositoryNotConfiguredException(),
     sp.GetRequiredService<ILogger<ReservationStatusQueryService>>()));
