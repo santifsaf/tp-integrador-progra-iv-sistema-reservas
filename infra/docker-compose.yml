@@ -32,3 +32,27 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
+
+
+
+  booking-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${BOOKING_DB_USER:-booking}
+      POSTGRES_PASSWORD: ${BOOKING_DB_PASSWORD:-booking}
+      POSTGRES_DB: ${BOOKING_DB_NAME:-booking}
+    ports:
+      # Puerto del host (configurable en infra/.env); dentro de la red de Docker siempre es 5432.
+      - "${BOOKING_DB_PORT:-5432}:5432"
+    volumes:
+      - booking-db-data:/var/lib/postgresql/data
+      # Crea la base booking_tests (la usa Booking.Data.Tests) la primera vez que se inicia el volumen.
+      - ./postgres/booking/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BOOKING_DB_USER:-booking} -d ${BOOKING_DB_NAME:-booking}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  booking-db-data:
