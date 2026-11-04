@@ -71,6 +71,30 @@ services:
       timeout: 5s
       retries: 10
 
+  availability-api:
+    build:
+      context: ..
+      dockerfile: src/Availability/Availability.Api/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:8080
+      - JwtSettings__Authority=http://keycloak:8081
+      - JwtSettings__Audience=availability-api
+      - JwtSettings__RequireHttpsMetadata=false
+    ports:
+      - "5100:8080"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   booking-db-data:
   availability-db-data:
