@@ -616,3 +616,21 @@ hay un wrapper (GetSeatsAvailabilityUseCase) que solo llama a GetSeatMapUseCase,
 •	El controller (SeatAvailabilityController) ahora inyecta directamente IGetSeatMapUseCase
 •	GetSeatMapUseCase implementa IGetSeatMapUseCase (interfaz)
 • El [Required] ahora funciona correctamente: valida que no sea null.
+
+
+ ## Prompt 21: integración con abailability.infrastructure
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante review de cambios
+
+### Contenido del Prompt Original:
+ 
+ ```
+se solicita integración con Availability.Infrastructure. Se debe:
+1.	Agregar referencia a Microsoft.EntityFrameworkCore.Design en .csproj
+2.	Registrar Infrastructure en Program.cs
+3.	Aplicar migraciones al iniciar la app
+
+ ```
+ ### Resultado Entregado:
+	integración con infraestructura completada. Se agregó referencia a EF Core Design, se registró Availability.Infrastructure en Program.cs y se implementó la aplicación de migraciones al iniciar la app.

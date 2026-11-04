@@ -1,6 +1,7 @@
 using Availability.Api.Middleware;
 using Availability.Application;
 using Microsoft.AspNetCore.Authentication;
+using Availability.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -44,6 +45,8 @@ try
     // Registrar dependencias de la capa de aplicación
     builder.Services.AddApplication();
 
+    // Registrar dependencias de la capa de infraestructura
+    builder.Services.AddInfrastructure(builder.Configuration);
     // Configurar autenticación JWT Bearer
     builder.Services
         .AddAuthentication(options =>
@@ -67,6 +70,9 @@ try
     builder.Services.AddAuthorization();
 
     var app = builder.Build();
+
+    // Aplicar migraciones al iniciar la aplicación
+    await app.Services.ApplyMigrationsAsync();
 
     // Orden crítico de middleware:
     // 1. ExceptionHandlingMiddleware PRIMERO para capturar excepciones de TODO lo que viene después
