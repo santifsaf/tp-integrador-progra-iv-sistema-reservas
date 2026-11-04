@@ -83,7 +83,7 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 | **U-06** | **Resuelto (2026-11-02)** se verificó desde una aplicación de consola externa que la suscripción `booking` existe en el topic `grupo5-booking-topic`. 
 | **U-07** | **Resuelto (2026-11-03, verificado en la implementación compartida de Booking):** `200` devuelve `{ "status", "description" }`; `404` significa que Booking todavía no tiene una reserva para el `requestId`. Availability interpreta ese `404` como pendiente si la solicitud existe localmente. | Booking API | T4.7 |
 | **U-08** | **Resuelto (2026-11-03):** estandarizar el header saliente como `X-Correlation-ID`. Las consultas de reserva usan `requestId`; otras consultas propagan el ID HTTP. | Santi / Rebeca | T4.8 |
-| **U-09** | **Acordado e implementado parcialmente (2026-11-04):** PostgreSQL 17 como `availability-db`, puerto host `5433` → contenedor `5432`, variables `AVAILABILITY_DB_NAME`, `AVAILABILITY_DB_USER`, `AVAILABILITY_DB_PASSWORD` y healthcheck `pg_isready`. La API no está en el compose, por lo que su `depends_on: condition: service_healthy` sigue pendiente de integración. | Felipe / Rebeca | T1.11, T2.4, T2.5 |
+| **U-09** | **Acordado e implementado (2026-11-04):** PostgreSQL 17 como `availability-db`, puerto host `5433` → contenedor `5432`, variables `AVAILABILITY_DB_NAME`, `AVAILABILITY_DB_USER`, `AVAILABILITY_DB_PASSWORD`, healthcheck `pg_isready` y dependencia saludable desde `availability-api`. | Felipe / Rebeca | T1.11, T2.4, T2.5 |
 | **U-10** | `Booking__BaseUrl=http://booking:8080/` en Docker y `http://localhost:5200/` en ejecución local. Falta cablearla en la configuración de la API, que mantiene Luciana. | Felipe / Santi | T4.5, T4.10 |
 | **U-11** | **Convención ** la API leerá `Keycloak__ClientSecret`, con valor `${AVAILABILITY_CLIENT_SECRET}` en Compose. Falta agregar ese mapeo cuando se incorpore el servicio de la API, responsabilidad de Luciana/Felipe. | Felipe | T4.4, T4.10 |
 | **U-12** | **Decisión confirmada (2026-11-03):** dentro de Compose, el token endpoint es `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; el `iss` permanece `http://localhost:8081/realms/seat-reservation`. Falta aplicar la configuración en la API. | Felipe | T4.3, T4.10 |
@@ -142,8 +142,8 @@ Ordenados por cuántas tareas destraban:
 | **T1.7** | `UpdateStatusAsync`: lanza `KeyNotFoundException` si la solicitud no existe. | T1.6, U-03 | **Implementada (2026-11-03)** | — |
 | **T1.8** | `EventRepository.GetAllAsync` ordenado por `StartsAt` ascendente e `Id` ascendente; `SeatRepository.GetByEventAsync` ordenado por `Label` e `Id` ascendentes; ambos de solo lectura con `AsNoTracking`. `ExistsAsync` verifica el par evento + asiento. | T1.3 | **Implementada** | — |
 | **T1.9** | Aplicar el orden definido para solicitudes, eventos y asientos, con `Id` ascendente como desempate estable. | T1.5, T1.8, U-04 | **Implementada (2026-11-03)** | — |
-| **T1.10** | Generar la migración inicial `InitialCreate` con `dotnet ef`, usando el Api como proyecto de inicio. | T1.4, T1.8, U-15 | **Bloqueada (U-15)** | `IDesignTimeDbContextFactory` en Infrastructure para generarla sin depender del Api |
-| **T1.11** | Verificar contra el PostgreSQL del compose que se crean las tres tablas y se carga el seed. | T1.10, U-09 | **Bloqueada (T1.10 / U-15)** | — |
+| **T1.10** | Generar la migración inicial `InitialCreate` con `dotnet ef`, usando el Api como proyecto de inicio. | T1.4, T1.8, U-15 | **Implementada y generada (2026-11-04)** | — |
+| **T1.11** | Verificar contra el PostgreSQL del compose que se crean las tres tablas y se carga el seed. | T1.10, U-09 | **Verificada (2026-11-04):** migración aplicada; dos eventos y ocho asientos sembrados. | — |
 | **T1.12** | Comentar en el código las decisiones y patrones (Repository, Fluent API, `AsNoTracking`, `ValueGeneratedNever`, UTC). | T1.5, T1.8 | **Implementada** | — |
 
 **Se considera terminada cuando:** el código compila y los repositorios cumplen BR-01, BR-03, BR-06 a BR-14. La migración y su verificación (T1.10 y T1.11) cierran los criterios de aceptación de tablas y seed.
@@ -160,9 +160,9 @@ Ordenados por cuántas tareas destraban:
 |---|---|---|---|---|
 | **T2.1** | `DatabaseInitializer.ApplyMigrationsAsync` (equivalente asíncrono de `Database.Migrate()`). | F1 | **Implementada** | — |
 | **T2.2** | `AddInfrastructure(IServiceCollection, IConfiguration)`: opciones, `DbContext` con `ConnectionStrings:AvailabilityDb`, repositorios y `TimeProvider`. Los registros del publisher, el token y el cliente de Booking se suman en F3 y F4. | F1 | **Implementada** | — |
-| **T2.3** | Coordinar con Luciana que `Program.cs` llame a `AddInfrastructure(builder.Configuration)` y a `ApplyMigrationsAsync()`, y que Api.csproj incluya `Microsoft.EntityFrameworkCore.Design`. | T2.1, T2.2, U-15 | **Bloqueada (U-15; responsabilidad de Luciana)** | — |
-| **T2.4** | Que Availability espere a que PostgreSQL esté listo: `depends_on` con `service_healthy` en el compose y reintentos de conexión en Npgsql. | U-09 | **Bloqueada (falta integrar la API al compose)** | `EnableRetryOnFailure()` en las opciones de Npgsql (propuesta técnica de la spec §5.4) |
-| **T2.5** | Verificar que la app migra y siembra la base al iniciar con `docker-compose up`. | T2.3, T2.4, U-09, U-15 | **Bloqueada (integración de Luciana y T2.4)** | — |
+| **T2.3** | Coordinar con Luciana que `Program.cs` llame a `AddInfrastructure(builder.Configuration)` y a `ApplyMigrationsAsync()`, y que Api.csproj incluya `Microsoft.EntityFrameworkCore.Design`. | T2.1, T2.2, U-15 | **Implementada e integrada (2026-11-04)** | — |
+| **T2.4** | Que Availability espere a que PostgreSQL esté listo: `depends_on` con `service_healthy` en el compose y reintentos de conexión en Npgsql. | U-09 | **Parcial:** Compose espera `availability-db` saludable; `EnableRetryOnFailure()` en Npgsql todavía no está configurado. | `EnableRetryOnFailure()` en las opciones de Npgsql (propuesta técnica de la spec §5.4) |
+| **T2.5** | Verificar que la app migra y siembra la base al iniciar con `docker-compose up`. | T2.3, T2.4, U-09, U-15 | **Verificada (2026-11-04):** la API inicia saludable y aplica/encuentra aplicada la migración; PostgreSQL contiene dos eventos y ocho asientos. | — |
 
 **Se considera terminada cuando:** al iniciar la app con el compose, la base queda migrada y sembrada sin pasos manuales.
 **PR 2:** `feat(availability): inicialización de la base y DI`.
@@ -289,17 +289,17 @@ Pruebas de `Availability.Infrastructure.Tests`:
 | Fase | Tareas | Terminadas | Parciales | Pendientes o bloqueadas |
 |---|---:|---:|---:|---:|
 | F0 | 6 | 5 | 1 | 0 |
-| F1 | 12 | 9 | 1 | 2 |
-| F2 | 5 | 2 | 0 | 3 |
+| F1 | 12 | 11 | 1 | 0 |
+| F2 | 5 | 4 | 1 | 0 |
 | F3 | 10 | 9 | 0 | 1 |
 | F4 | 11 | 7 | 0 | 4 |
 | F5 | 7 | 4 | 3 | 0 |
 | F6 | 10 | 5 | 5 | 0 |
 | F7 | 6 | 0 | 1 | 5 |
-| **Total** | **67** | **41** | **11** | **15** |
+| **Total** | **67** | **45** | **12** | **10** |
 
 **Criterio del resumen:** "Parciales" incluye tareas con una parte externa o de integración todavía pendiente; "Pendientes o bloqueadas" incluye las dependientes de decisiones, responsables externos, servicios reales o cierre de fases. T0.6 y T1.1 quedan parciales hasta compartir la configuración y los GUID del seed, respectivamente. T3.7 se confirmó mergeada en `origin/develop`.
 
-**Desbloqueos recientes:** U-03 permitió completar T1.7, U-04 T1.9, U-07 T4.7 y U-17/U-18 T5.1–T5.4. U-16 quedó resuelta con el acuerdo de xUnit, PostgreSQL vía Testcontainers, handlers HTTP falsos y doble de Service Bus. T6.7–T6.10 están verificadas; T6.2–T6.6 están implementadas, pero su ejecución requiere Docker disponible. T4.6–T4.9 y T4.11 también están implementadas. U-08 a U-14 tienen decisiones confirmadas. De U-09 solo está implementado el contenedor de base; la API aún no está en Compose, por lo que siguen pendientes `depends_on` y el mapeo del secreto U-11. Las direcciones acordadas para U-10/U-12 tampoco están configuradas en la API. La revisión confirmó que [Availability.Api.csproj](../../Availability.Api/Availability.Api.csproj) aún no referencia `Microsoft.EntityFrameworkCore.Design` y [Program.cs](../../Availability.Api/Program.cs) todavía no llama a `AddInfrastructure` ni a `ApplyMigrationsAsync`. T1.10 continúa bloqueada hasta coordinar U-15.
+**Desbloqueos recientes:** U-03 permitió completar T1.7, U-04 T1.9, U-07 T4.7 y U-17/U-18 T5.1–T5.4. U-16 quedó resuelta con el acuerdo de xUnit, PostgreSQL vía Testcontainers, handlers HTTP falsos y doble de Service Bus. T6.7–T6.10 están verificadas; T6.2–T6.6 están implementadas, pero requieren ejecutar Docker tests. T1.10 y T1.11 quedaron completadas: se generó y aplicó `InitialCreate` en PostgreSQL 17 y se verificaron dos eventos y ocho asientos. T2.3 y T2.5 también se verificaron con la API iniciada desde Compose. T2.4 está parcial: Compose espera el healthcheck de PostgreSQL, pero Npgsql todavía no tiene `EnableRetryOnFailure()`. T4.6–T4.9 y T4.11 están implementadas. Las configuraciones de servicios externos para T4.10 y la publicación real de T3.9 siguen pendientes.
 
-**Por dónde continuar ya mismo:** coordinar con Luciana U-15 (`AddInfrastructure`, `ApplyMigrationsAsync` y `Microsoft.EntityFrameworkCore.Design`) y con ella/Felipe el servicio API en Compose, `depends_on: condition: service_healthy` y las variables acordadas. Cuando eso esté integrado, generar/verificar la migración (T1.10/T1.11) y probar `BookingClient` contra servicios reales (T4.10). T3.9 requiere autorización y acceso para publicar en Service Bus; para completar F6, ejecutar T6.2–T6.6 con Docker disponible; F7 sigue sujeto a U-19/U-20 y al cierre de fases.
+**Por dónde continuar ya mismo:** configurar el acceso de la API a Booking/Keycloak y ejecutar T4.10; coordinar autorización para la prueba real de Service Bus T3.9. Para completar F6, ejecutar T6.2–T6.6 con Docker disponible. T2.4 puede cerrarse agregando reintentos de conexión Npgsql si el grupo confirma esa decisión. F7 sigue sujeto a U-19/U-20 y al cierre de fases.
