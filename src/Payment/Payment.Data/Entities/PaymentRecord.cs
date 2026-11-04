@@ -10,7 +10,7 @@ namespace Payment.Data.Entities
         public string Currency { get; set; } = string.Empty;
         public PaymentStatus Status { get; set; }
         public string? FailureReason { get; set; }
-        //public DateTime CreatedAt { get; set; } para logs y auditoria
-        //public DateTime? CompletedAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
     }
 }
