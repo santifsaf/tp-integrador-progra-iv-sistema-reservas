@@ -3,7 +3,7 @@ namespace Payment.Data.Entities
 {
     public class PaymentRecord
     {
-        public Guid id { get; init; }
+        public Guid Id { get; init; }
         public string ReservationId { get; set; } = string.Empty;
         public string OperationId { get; set; } = string.Empty;
         public Int64 AmountCents { get; set; }
