@@ -83,3 +83,12 @@ Agrega pruebas para verificar que ReservationPaymentClient envíe correctamente 
 Comprueba que los resultados no modifiquen el estado de la reserva, que se propague la cancelación y que los datos inválidos se rechacen sin solicitar tokens ni realizar llamadas gRPC.
 
 Verifica tambien el registro de IPaymentClient mediante inyección de dependencias y la validacion de la configuración.
+
+
+## Prompt 08
+
+Actualiza mi rama con los cambios de feat/booking y develop, conservando el trabajo existente. Revisa y mostrame los conflictos de integracion si los hay.
+
+Prepara Keycloak y PostgreSQL de Booking para ejecutar el proyecto localmente. Si el puerto de PostgreSQL esta ocupado, utiliza otro puerto sin modificar el servicio existente. Guarda las credenciales fuera del repositorio y aplica las migraciones aprobadas.
+
+Ejecuta la compilacion y las pruebas. Comproba tambien los endpoints de Booking contra PostgreSQL y con tokens reales de Keycloak: estados de reserva, asientos ocupados, errores HTTP y correlacion de los logs.

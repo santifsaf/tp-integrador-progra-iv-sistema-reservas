@@ -35,6 +35,57 @@ Keycloak no usa base externa: guarda todo dentro del contenedor. Al recrearlo ar
 el realm, así que los usuarios que entraron con GitHub se pierden. Para aplicar cambios del JSON:
 `docker compose -f infra/docker-compose.yml up -d --force-recreate keycloak`.
 
+
+## Postgres de Booking
+
+Cada microservicio tiene su propia base PostgreSQL en su propio contenedor. El de Booking es el servicio `booking-db`:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --wait booking-db
+```
+
+- **Puerto:** se publica en `localhost:5432`. Se puede cambiar con `BOOKING_DB_PORT` en `infra/.env`;
+  entre contenedores siempre es `booking-db:5432`. Cada servicio debe usar un puerto distinto del host
+  (sugerido: Availability 5433, Payment 5434, Notifications 5435).
+- **Credenciales:** usuario, contraseña y base valen `booking` (`BOOKING_DB_USER`, `BOOKING_DB_PASSWORD`,
+  `BOOKING_DB_NAME`). Son valores de desarrollo local, no secretos.
+- **Bases:** además de `booking`, la primera vez que se crea el volumen el script
+  `postgres/booking/init/` crea `booking_tests`, que usan los tests de `Booking.Data.Tests`.
+- **Datos:** viven en el volumen `booking-db-data` y sobreviven a `docker compose down`.
+  Para empezar de cero (y que vuelva a correr el script de inicialización): `docker compose -f infra/docker-compose.yml down -v`.
+
+Connection string desde la máquina (para `dotnet ef`, los tests y la API corriendo fuera de Docker):
+
+```
+Host=localhost;Port=5432;Database=booking;Username=booking;Password=booking
+```
+
+Para la API, guardarla en user-secrets:
+
+```bash
+dotnet user-secrets set "ConnectionStrings:Booking" "Host=localhost;Port=5432;Database=booking;Username=booking;Password=booking" --project src/Booking/Booking.Api
+```
+
+### Migraciones y tests
+
+```bash
+dotnet ef database update --project src/Booking/Booking.Data
+dotnet test src/Booking/Booking.Data.Tests
+```
+
+Los tests aplican las migraciones solos sobre `booking_tests` y requieren `booking-db` levantado. Para
+ejecutar el resto sin la base: `dotnet test --filter "Category!=Integration"`.
+
+Al incorporar Booking al compose, configurar en su servicio (el host es el nombre del servicio, no `localhost`):
+
+```yaml
+environment:
+  ConnectionStrings__Booking: Host=booking-db;Port=5432;Database=booking;Username=booking;Password=booking
+depends_on:
+  booking-db:
+    condition: service_healthy
+```
+
 ## Login con GitHub
 
 La pantalla de login muestra un botón por cada identity provider habilitado (por ahora, GitHub).
@@ -90,4 +141,4 @@ desde la red de Docker. El Keycloak del compose ya habilita el backchannel diná
 para publicar también una dirección interna de las claves de firma (`jwks_uri`).
 Permitir metadata por HTTP es una configuración explícita del entorno local del TP.
 Fuera de Development, Booking exige HTTPS por defecto y mantiene la validación de
-issuer, audiencia, vencimiento y firma. El compose actual solo levanta Keycloak.
+issuer, audiencia, vencimiento y firma. El compose actual levanta Keycloak y el Postgres de Booking.
