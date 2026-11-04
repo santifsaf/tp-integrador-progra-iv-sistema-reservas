@@ -118,6 +118,38 @@ namespace Payment.Tests
             Assert.Equal(1, _repo.Count);
         }
 
+        [Fact]
+        public async Task Charge_CarreraConDatosDistintos_LanzaConflicto()
+        {
+            // Otro request gana la carrera con el mismo OperationId pero otro importe.
+            _repo.RaceWinner = Seeded("op-10", PaymentStatus.PENDING, DateTime.UtcNow);   // importe 1000
+
+            await Assert.ThrowsAsync<PaymentConflictException>(
+                () => _service.ChargeAsync(Request("op-10", 2000)));
+        }
+
+        [Fact]
+        public async Task Charge_CarreraConMismosDatos_DevuelveElPagoDelGanador()
+        {
+            var winner = Seeded("op-11", PaymentStatus.PENDING, DateTime.UtcNow);
+            _repo.RaceWinner = winner;
+
+            var result = await _service.ChargeAsync(Request("op-11", 1000));
+
+            Assert.Equal(winner.Id.ToString(), result.PaymentId);
+            Assert.Equal(PaymentStatus.PENDING, result.Status);
+            Assert.Equal(1, _repo.Count);
+        }
+
+        [Fact]
+        public async Task Charge_TryAddFalloPeroNoHayRegistro_LanzaErrorClaro()
+        {
+            _repo.ForceAddToFail = true;
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => _service.ChargeAsync(Request("op-12", 1000)));
+        }
+
         [Theory]
         [InlineData(0)]
         [InlineData(-500)]

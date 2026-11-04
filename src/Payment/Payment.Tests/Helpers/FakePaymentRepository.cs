@@ -9,6 +9,12 @@ namespace Payment.Tests.Helpers
     public sealed class FakePaymentRepository : IPaymentRepository
     {
         private readonly Dictionary<string, PaymentRecord> _store = [];
+        
+        // Simula que otra request gano la carrera pero se devuelve false en TryAddAsync
+        public PaymentRecord? RaceWinner { get; set; } 
+
+        //Fuerza que TryAddAsync devuelva false sin insertar nada (caso especial)
+        public bool ForceAddToFail { get; set; }
 
         public int Count => _store.Count;
 
@@ -22,6 +28,15 @@ namespace Payment.Tests.Helpers
         //Verifica si ya existe un pago con el mismo OperationId, si no existe lo agrega y devuelve true, sino devuelve false.
         public Task<bool> TryAddAsync(PaymentRecord payment, CancellationToken ct = default)
         {
+            if (RaceWinner is not null)
+            {
+                _store[RaceWinner.OperationId] = Clone(RaceWinner);
+                RaceWinner = null;
+                return Task.FromResult(false);
+            }
+
+            if (ForceAddToFail) return Task.FromResult(false);
+
             if (_store.ContainsKey(payment.OperationId)) return Task.FromResult(false);
             _store[payment.OperationId] = Clone(payment);
             return Task.FromResult(true);

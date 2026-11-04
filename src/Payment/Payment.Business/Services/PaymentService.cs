@@ -36,10 +36,7 @@ namespace Payment.Business.Services
 
             if (existing is not null)
             {
-                if (existing.ReservationId != request.ReservationId
-                    || existing.AmountCents != request.AmountCents
-                    || existing.Currency != request.Currency)
-                    throw new PaymentConflictException(request.OperationId);
+                EnsureSameData(existing, request);
 
                 var isStalePending = existing.Status == PaymentStatus.PENDING
                                      && DateTime.UtcNow - existing.CreatedAt > StalePendingAfter;
@@ -72,8 +69,13 @@ namespace Payment.Business.Services
             {
                 //Dos request llegan casi al mismo tiempo y las dos intentan guardar un Payment 
                 //La base solo deja pasar una y el perdedor busca el registro ganador y lo devuelve.
-                var winner = await _repository.GetByOperationIdAsync(request.OperationId);
-                return ToDto(winner!);
+                var winner = await _repository.GetByOperationIdAsync(request.OperationId)
+                    ?? throw new InvalidOperationException(
+                        $"[{request.OperationId}] TryAddAsync indica que el OperationId ya existe pero no encontro el registro");
+
+
+                EnsureSameData(winner, request);
+                return ToDto(winner);
             }
 
             return await ProcessAsync(payment);
@@ -90,6 +92,14 @@ namespace Payment.Business.Services
             return payment is null ? null : ToDto(payment);
         }
 
+
+        private static void EnsureSameData(PaymentRecord existing, ChargeRequestDto request)
+        {
+            if (existing.ReservationId != request.ReservationId
+                || existing.AmountCents != request.AmountCents
+                || existing.Currency != request.Currency)
+                throw new PaymentConflictException(request.OperationId);
+        }
 
         private static void Validate(ChargeRequestDto request)
         {
