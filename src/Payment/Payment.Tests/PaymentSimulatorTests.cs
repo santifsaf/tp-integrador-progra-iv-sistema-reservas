@@ -34,11 +34,10 @@ namespace Payment.Tests
             var (Status, FailureReason) = _simulator.Simulate(amountCents);
 
             Assert.Equal(PaymentStatus.REJECTED, Status);
-            Assert.Equal("Pago Fallido", FailureReason);
+            Assert.Equal(PaymentSimulator.RejectedReason, FailureReason);
         }
 
         //CASOS DE NO DISPONIBLE: cualquier monto que termine en 33
-
         [Theory]
         [InlineData(1033)]
         [InlineData(33)]
@@ -48,7 +47,7 @@ namespace Payment.Tests
             var (Status, FailureReason) = _simulator.Simulate(amountCents);
 
             Assert.Equal(PaymentStatus.UNAVAILABLE, Status);
-            Assert.Equal("Pago no disponible", FailureReason);
+            Assert.Equal(PaymentSimulator.UnavailableReason, FailureReason);
         }
     }
 }

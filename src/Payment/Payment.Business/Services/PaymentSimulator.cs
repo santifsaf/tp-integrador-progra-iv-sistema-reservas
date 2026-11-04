@@ -10,14 +10,16 @@ namespace Payment.Business.Services
      */
     public class PaymentSimulator
     {
+        public const string RejectedReason = "Pago Fallido";
+        public const string UnavailableReason = "Pago no disponible";
         public (PaymentStatus Status, string? FailureReason) Simulate (long amountCents)
         {
             var lastTwoDigits = amountCents % 100;
 
             return lastTwoDigits switch
             {
-                99 => (PaymentStatus.REJECTED, "Pago Fallido"),
-                33 => (PaymentStatus.UNAVAILABLE, "Pago no disponible"),
+                99 => (PaymentStatus.REJECTED, RejectedReason),
+                33 => (PaymentStatus.UNAVAILABLE, UnavailableReason),
                 _ => (PaymentStatus.SUCCEEDED, null)
             };
         }
