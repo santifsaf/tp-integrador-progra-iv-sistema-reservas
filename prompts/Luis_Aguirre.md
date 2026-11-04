@@ -158,3 +158,31 @@ Restricciones:
 •	Comentarios en español solo para decisiones no obvias (por qué RunContinuationsAsynchronously, por qué contextos separados, por qué repetir el escenario).
 Formato de respuesta:
 1.	el método de test, 2) una lista breve de supuestos y de lo que el test NO cubre.
+
+
+
+# Prompt 8:
+Contexto:
+Cambié ReservationRepository para que TryHoldAsync y AddRejectedAsync suelten la entidad del contexto (EntityState.Detached) en un bloque finally: tanto tras un insert exitoso como tras un conflicto manejado o un error inesperado. El motivo: la capa de negocio (ReservationRequestProcessor) MUTA en memoria el mismo objeto Reservation después de resolver el cobro (Status, RejectionReason, UpdatedAt). Si ese objeto siguiera trackeado, cualquier SaveChangesAsync posterior en el mismo contexto persistiría esas mutaciones saltándose las condiciones de los UPDATE atómicos (status = 'Held' AND expires_at > now). Podés revisar el repositorio, los dos archivos de tests donde van a ir los tests nuevos, la fixture y TestData.cs.
+
+Tarea:
+Escribí SOLO los tests nuevos, listos para pegar dentro de las clases existentes (no reescribas los archivos). Usá los helpers que cada archivo ya tiene o TestData donde corresponda.
+
+En ReservationRepositoryHoldTests:
+1. TryHoldAsync exitoso no deja la entidad trackeada: un solo contexto, llamada con una reserva Held nueva, resultado Created y ChangeTracker.Entries() vacío.
+2. Una mutación en memoria no se persiste con un guardado posterior: con un solo contexto y un solo repositorio, TryHoldAsync de una reserva A (Created); después mutar A.Status = Confirmed en memoria; después TryHoldAsync de otra reserva B sobre OTRO asiento (Created); finalmente, con un contexto nuevo, leer A con GetByRequestIdAsync y verificar que en la base sigue Held.
+3. Un error inesperado tampoco deja la entidad trackeada: construí una reserva con Currency de más de 3 caracteres (la columna es varchar(3)) para provocar una DbUpdateException que NO es una violación de unicidad. Verificá con Assert.ThrowsAsync<DbUpdateException> que se propaga y que después ChangeTracker.Entries() está vacío.
+
+En ReservationRepositoryRejectedTests:
+4. AddRejectedAsync exitoso no deja la entidad trackeada (mismo criterio que el 1).
+5. Mutación posterior no se persiste: con un solo contexto, AddRejectedAsync de una reserva Rejected R1 (motivo SeatOccupied) devuelve true; mutar R1.RejectionReason a PaymentFailed en memoria; AddRejectedAsync de otra reserva Rejected R2 devuelve true; con un contexto nuevo, verificar que R1 conserva el motivo SeatOccupied en la base.
+
+Restricciones:
+- Un contexto por test (await using); el contexto de verificación es siempre otro, nuevo.
+- Cada test empieza con await _fixture.ResetAsync(), igual que los existentes.
+- Los tests 2 y 5 tienen que FALLAR si se elimina el bloque finally del repositorio: explicá en una frase, para cada uno, qué escribiría en la base el SaveChanges posterior sin ese finally.
+- Sin librerías nuevas ni mocking. No modifiques los tests existentes, la fixture, TestData.cs ni el repositorio. Indicá si hace falta algún using nuevo (por ejemplo Microsoft.EntityFrameworkCore).
+- Nombres en español que describan el comportamiento; comentarios en español solo para decisiones no obvias (por qué Currency largo provoca el error, por qué se muta A antes de guardar B).
+
+Formato de respuesta:
+1) los cinco tests, separados por archivo, 2) una lista breve de supuestos y de lo que NO cubren.
