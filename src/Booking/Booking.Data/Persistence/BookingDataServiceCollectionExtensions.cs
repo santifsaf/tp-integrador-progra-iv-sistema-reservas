@@ -13,4 +13,19 @@ public static class BookingDataServiceCollectionExtensions
         services.AddScoped<IReservationRepository, ReservationRepository>();
         return services;
     }
+
+    // Aplica las migraciones pendientes. Si no se registró AddBookingData (por ejemplo, en el
+    // entorno Testing sin connection string), no hace nada. Con varias réplicas es seguro: EF
+    // toma un bloqueo exclusivo al migrar y las demás esperan.
+    public static async Task MigrateBookingDatabaseAsync(this IServiceProvider services, CancellationToken ct = default)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetService<BookingDbContext>();
+        if (db is null)
+        {
+            return;
+        }
+
+        await db.Database.MigrateAsync(ct);
+    }
 }
