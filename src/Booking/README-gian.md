@@ -116,6 +116,11 @@ dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>
 - **Pago exitoso después de vencer:** no se confirma (el asiento pudo pasar a otro);
   queda en el log como caso para devolución (pendiente: guardarlo en la tabla como
   `REFUND_REQUIRED`).
+- **Validación del mensaje:** si falta un campo en el JSON queda en su valor por defecto
+  (`Guid.Empty`, 0, null). `ReservationRequestedMessageValidator` exige ids no vacíos,
+  `requestedAt`, importe mayor que cero y moneda de 3 letras. El consumidor manda los
+  mensajes inválidos a dead-letter y el procesador los rechaza como segunda barrera, sin
+  persistir ni cobrar.
 - **Competing consumers:** todas las réplicas leen la suscripción `booking` y cada
   mensaje lo procesa una sola.
 - **Completar después de guardar:** `AutoCompleteMessages = false`. Si hay un error,
