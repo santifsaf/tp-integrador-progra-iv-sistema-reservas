@@ -170,6 +170,19 @@ public sealed class PaymentGrpcServiceValidationTests
     }
 
     [Fact]
+    public async Task Charge_BusinessValidationException_ReturnsInvalidArgument()
+    {
+        var service = new PaymentGrpcService(
+            new FakePaymentService(throwValidation: true));
+
+        var request = CreateValidChargeRequest();
+
+        await AssertStatusAsync(
+            () => service.Charge(request, null!),
+            StatusCode.InvalidArgument);
+    }
+
+    [Fact]
     public async Task GetPayment_UnknownOperationId_ReturnsNotFound()
     {
         var service = new PaymentGrpcService(
@@ -212,8 +225,9 @@ public sealed class PaymentGrpcServiceValidationTests
     }
 
     private sealed class FakePaymentService(
-    bool throwConflict = false,
-    bool paymentNotFound = false) : IPaymentService
+     bool throwConflict = false,
+     bool paymentNotFound = false,
+     bool throwValidation = false) : IPaymentService
     {
         public ChargeRequestDto? LastChargeRequest { get; private set; }
         public Task<PaymentResultDto> ChargeAsync(ChargeRequestDto request)
@@ -224,7 +238,11 @@ public sealed class PaymentGrpcServiceValidationTests
             {
                 throw new PaymentConflictException(request.OperationId);
             }
-
+            if (throwValidation)
+            {
+                throw new PaymentValidationException(
+                    "Error de validación de negocio.");
+            }
             return Task.FromResult(new PaymentResultDto
             {
                 PaymentId = "33333333-3333-3333-3333-333333333333",

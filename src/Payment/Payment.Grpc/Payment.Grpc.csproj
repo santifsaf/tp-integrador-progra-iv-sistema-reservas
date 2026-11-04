@@ -7,6 +7,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="../Payment.Business/Payment.Business.csproj" />
+		<ProjectReference Include="..\Payment.Data\Payment.Data.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -15,8 +16,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Protobuf Include="../../../contracts/proto/payment.proto"
-				  ProtoRoot="../../../contracts/proto"
-				  GrpcServices="Server" />
+		<Protobuf Include="../../../contracts/proto/payment.proto" ProtoRoot="../../../contracts/proto" GrpcServices="Server" />
 	</ItemGroup>
 </Project>

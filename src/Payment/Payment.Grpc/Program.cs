@@ -1,3 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+using Payment.Business.Services;
+using Payment.Data;
+using Payment.Data.Repositories;
 using Payment.Grpc.Auditing;
 using Payment.Grpc.Security;
 using Payment.Grpc.Services;
@@ -7,6 +11,22 @@ using Payment.Grpc.Services;
 // vive en Payment.Business y el acceso a datos en Payment.Data; el dominio es anémico
 // (entidades con datos, reglas en los servicios), como pide el enunciado.
 var builder = WebApplication.CreateBuilder(args);
+
+// Configurar la conexión a la base de datos de Payment.
+var connectionString = builder.Configuration.GetConnectionString("Payment")
+    ?? throw new InvalidOperationException(
+        "Falta configurar ConnectionStrings:Payment.");
+
+// Registrar Entity Framework Core con PostgreSQL.
+builder.Services.AddDbContext<PaymentDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+// Registrar el repositorio de pagos.
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+
+// Registrar la lógica de negocio y el simulador.
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddSingleton<PaymentSimulator>();
 
 // Consigna 3e: autenticación de microservicios contra Keycloak.
 // El FallbackPolicy de AddPaymentAuthentication protege cualquier gRPC que se mapee.

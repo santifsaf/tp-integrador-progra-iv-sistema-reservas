@@ -59,6 +59,14 @@ public class PaymentGrpcService : PaymentService.PaymentServiceBase
                     StatusCode.AlreadyExists,
                     "payment_operation_id ya existe con datos diferentes."));
         }
+
+        catch (PaymentValidationException ex)
+        {
+            throw new RpcException(
+                new Status(
+                    StatusCode.InvalidArgument,
+                    ex.Message));
+        }
     }
 
 
