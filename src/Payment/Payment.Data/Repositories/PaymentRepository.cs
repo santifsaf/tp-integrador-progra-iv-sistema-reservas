@@ -21,9 +21,14 @@ namespace Payment.Data.Repositories
                 await _db.SaveChangesAsync(ct);
                 return true;
             }
-            catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+
+            //Solo entramos al catch si el error es por violacion de unicidad y es por el OperationId 
+            catch (DbUpdateException e) when (e.InnerException is PostgresException 
+            { 
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: PaymentDbContext.OperationIdIndexName
+            })
             {
-                //Solo entramos al catch si el error es de violacion de unicidad, es decir, si viene otro pago con el mismo OperationId.
                 _db.Entry(payment).State = EntityState.Detached;
                 return false;
             }

@@ -10,6 +10,7 @@ namespace Payment.Data
     {
         public DbSet<PaymentRecord> Payments => Set<PaymentRecord>();
 
+        public const string OperationIdIndexName = "payments_operation_id_key";
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<PaymentRecord>(e =>
@@ -17,7 +18,7 @@ namespace Payment.Data
                 e.ToTable("payments");
                 e.HasKey(p => p.Id);
                 // OperationId unico para lograr idempotencia de la operacion de pago
-                e.HasIndex(p => p.OperationId).IsUnique(); 
+                e.HasIndex(p => p.OperationId).IsUnique().HasDatabaseName(OperationIdIndexName); 
                 e.Property(p => p.OperationId).IsRequired().HasMaxLength(100);
                 e.Property(p => p.ReservationId).IsRequired().HasMaxLength(100);
                 e.Property(p => p.Currency).IsRequired().HasMaxLength(3);
