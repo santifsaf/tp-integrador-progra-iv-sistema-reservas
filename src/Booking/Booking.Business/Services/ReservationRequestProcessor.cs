@@ -38,6 +38,14 @@ public sealed class ReservationRequestProcessor(
 
     public async Task<Reservation> ProcessAsync(ReservationRequestedMessage request, CancellationToken ct)
     {
+        // Segunda barrera: el consumidor ya valida antes de llamar, pero la regla vive acá,
+        // en la capa de negocio. Una solicitud inválida no llega a la base ni a Payment.
+        var errors = ReservationRequestedMessageValidator.Validate(request);
+        if (errors.Count > 0)
+        {
+            throw new InvalidReservationRequestException(errors);
+        }
+
         using var _ = BeginChain(logger, request.RequestId);
         Start(logger, request.RequestId, "ProcessReservationRequest");
 
@@ -78,6 +86,11 @@ public sealed class ReservationRequestProcessor(
             UserId = request.UserId,
             EventId = request.EventId,
             SeatId = request.SeatId,
+            // El importe y la moneda se copian del mensaje y quedan fijos en la reserva:
+            // todos los intentos de cobro de esta reserva usan el mismo importe, aunque
+            // el precio del evento cambie después en Availability.
+            AmountCents = request.AmountCents,
+            Currency = request.Currency,
             Status = ReservationStatus.Held,
             ExpiresAt = now + _options.HoldDuration,
             CreatedAt = now,

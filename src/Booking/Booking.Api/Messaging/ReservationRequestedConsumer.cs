@@ -84,14 +84,13 @@ internal sealed class ReservationRequestedConsumer(
         }
 
         // DECISIÓN: un mensaje mal formado no se va a arreglar reintentando, así que va
-        // directo a la dead-letter queue (cola de mensajes muertos) para revisarlo a mano.
-        if (request is null || request.RequestId == Guid.Empty)
+        // directo a la dead-letter queue (cola de mensajes muertos) para revisarlo a mano,
+        // sin crear la reserva ni pedir el cobro. Las reglas (ids no vacíos, importe mayor
+        // que cero, moneda de 3 letras) están en ReservationRequestedMessageValidator.
+        var errors = ReservationRequestedMessageValidator.Validate(request);
+        if (request is null || errors.Count > 0)
         {
-            await args.DeadLetterMessageAsync(
-                message,
-                deadLetterReason: "InvalidMessage",
-                deadLetterErrorDescription: "El cuerpo no respeta el contrato ReservationRequestedMessage",
-                cancellationToken: args.CancellationToken);
+            await DeadLetterInvalidAsync(args, errors);
             return;
         }
 
@@ -105,6 +104,12 @@ internal sealed class ReservationRequestedConsumer(
             await processor.ProcessAsync(request, args.CancellationToken);
 
             await args.CompleteMessageAsync(message, args.CancellationToken);
+        }
+        catch (InvalidReservationRequestException ex)
+        {
+            // No debería pasar porque se valida arriba, pero si el procesador rechaza la
+            // solicitud, tampoco sirve reintentarla.
+            await DeadLetterInvalidAsync(args, ex.Errors);
         }
         catch (PaymentResultUncertainException ex)
         {
@@ -128,6 +133,18 @@ internal sealed class ReservationRequestedConsumer(
 
             await args.AbandonMessageAsync(message, cancellationToken: CancellationToken.None);
         }
+    }
+
+    private async Task DeadLetterInvalidAsync(ProcessMessageEventArgs args, IReadOnlyList<string> errors)
+    {
+        var detail = string.Join(" ", errors);
+        logger.LogWarning("Mensaje {MessageId} inválido, va a dead-letter: {Detail}", args.Message.MessageId, detail);
+
+        await args.DeadLetterMessageAsync(
+            args.Message,
+            deadLetterReason: "InvalidMessage",
+            deadLetterErrorDescription: detail,
+            cancellationToken: args.CancellationToken);
     }
 
     private Task HandleErrorAsync(ProcessErrorEventArgs args)

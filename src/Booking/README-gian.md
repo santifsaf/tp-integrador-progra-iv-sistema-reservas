@@ -15,7 +15,7 @@ estados `Held/Confirmed/Rejected/Expired` guardados como texto, ids `Guid`.
 | `Booking.Data` | Datos | Interfaz `IReservationRepository` con el SQL esperado en comentarios | Interfaz: Gian. Implementación EF: **Luis** |
 | `Booking.Business` | Negocio | `ReservationRequestProcessor`, `ReservationExpirationService`, `ReservationExpirationWorker`, `IPaymentClient`, `IReservationEventPublisher` | Gian |
 | `Booking.Api/Messaging` | Presentación (entrada por broker) | `ReservationRequestedConsumer` con `ServiceBusProcessor` | Gian |
-| `Booking.Business.Tests` | Tests | 22 casos con fakes en memoria | Gian |
+| `Booking.Business.Tests` | Tests | 24 casos de la lógica de reservas (más los de las consultas de Santi) | Gian |
 | `Booking.Demo` | Herramienta | Simulador local (no se despliega) | Gian |
 
 Dependencias N-Layer: `Api → Business → Data`. Data no conoce a nadie.
@@ -50,14 +50,16 @@ y Payment que nunca responde (la reserva vence). Retención de 15 s para ver el 
 
 ## Cómo se engancha en `Booking.Api/Program.cs`
 
-Todavía NO está registrado en `Program.cs` a propósito: sin el repositorio de Luis y el
-cliente gRPC de Santi, la app no arrancaría. Cuando estén, se agregan estas tres líneas
-antes de `builder.Build()`:
+Ya está registrado: `AddReservationRequestConsumer(builder.Configuration)`, después de
+`AddBookingData` (repositorio de Luis) y `AddPaymentCommunication` (cliente de Santi).
+Sin `Broker:ConnectionString` la API no arranca, salvo en el entorno `Testing`.
 
-```csharp
-builder.Services.AddScoped<IReservationRepository, ReservationRepository>(); // Luis
-builder.Services.AddScoped<IPaymentClient, PaymentGrpcClient>();             // Santi
-builder.Services.AddReservationRequestConsumer(builder.Configuration);       // Gian (using Booking.Api.Messaging)
+Para correr `Booking.Api` localmente:
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:Booking" "<connection string de Postgres>" --project src/Booking/Booking.Api
+dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>" --project src/Booking/Booking.Api
+dotnet user-secrets set "Payment:ClientSecret" "booking-secret" --project src/Booking/Booking.Api
 ```
 
 ## Configuración
@@ -77,16 +79,18 @@ dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>
 # o en docker-compose:  Broker__ConnectionString: ${BOOKING_SERVICEBUS_CONNECTION}
 ```
 
-## Qué falta acordar
+## Estado de la integración
 
-| Con | Qué | Dónde está |
-|---|---|---|
-| **Rebeca y Felipe** | Contrato del mensaje (`requestId`, `eventId`, `seatId`, `userId`, `requestedAt`, JSON camelCase). Publicar un record propio, **no la entidad `ReservationRequest`** (llegaría `id` en vez de `requestId` y todo iría a dead-letter). Pedirle `MessageId = requestId`. Sumar `amountCents` y `currency` cuando `Event` tenga precio. | `Booking.Business/Messages/ReservationRequestedMessage.cs`, después a `/contracts` |
-| **Luis** | Implementar `IReservationRepository` con los tres índices, los estados como texto y los `UPDATE` condicionales. Sumar `GetOccupiedSeatIdsAsync(eventId)` para el endpoint de asientos ocupados. | `Booking.Data/IReservationRepository.cs` |
-| **Santi** | Implementar `IPaymentClient` (con token de Keycloak, `aud=payment`) con el mapeo de la interfaz: solo `PAYMENT_UNAVAILABLE` explícito → `Unavailable`; cualquier `RpcException` (incluido `StatusCode.Unavailable`) → `Uncertain`. Endpoints que pide `IBookingClient` de Availability: `GET /events/{eventId}/occupied-seats` y `GET /reservations/{requestId}` → `{status, description}`, 404 si todavía no se procesó. | `Booking.Business/Payments/IPaymentClient.cs` |
-| **Agus y Juan** | Payment idempotente por `ReservationId` (`payments.reservation_id` UNIQUE): si se reintenta, devuelve el resultado anterior sin volver a cobrar. | Contrato `.proto` |
-| **Juan y Kevin** | Cómo le llegan a Notifications `ReservationCreated` y `ReservationConfirmed`: suscripción nueva pedida al profe, o HTTP. Por ahora solo se loguean. | `Booking.Business/Events/IReservationEventPublisher.cs` |
-| **Felipe** | Formato de los logs de auditoría (el correlation id ya es `RequestId`). | `Booking.Business/Auditing/AuditLog.cs` |
+| Pieza | Estado |
+|---|---|
+| Contrato del mensaje | ✅ `contracts/events/ReservationRequestedMessage.cs` (Rebeca). Booking compila ese archivo, no una copia. |
+| Importe y moneda | ✅ Se copian del mensaje a la reserva y se cobran con `ReservationPaymentClient` (Santi). |
+| Repositorio Postgres | ✅ `ReservationRepository` (Luis), con migración de importe y moneda. |
+| Cliente gRPC a Payment | ✅ `GrpcPaymentGateway` + `ReservationPaymentClient` (Santi). |
+| Publisher de Availability | ⏳ Rebeca: completar `AmountCents` y `Currency` con el precio del evento. |
+| Servidor de Payment | ⏳ Agus y Juan: simulador de pagos idempotente por `payment_operation_id`. |
+| Notifications | ⏳ Juan y Kevin: hoy los eventos solo se loguean (`IReservationEventPublisher`). |
+| Docker | ⏳ Dockerfile de Booking y bloque en el compose con 2 réplicas. |
 
 ## Decisiones (resumen para la defensa)
 
@@ -112,6 +116,11 @@ dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>
 - **Pago exitoso después de vencer:** no se confirma (el asiento pudo pasar a otro);
   queda en el log como caso para devolución (pendiente: guardarlo en la tabla como
   `REFUND_REQUIRED`).
+- **Validación del mensaje:** si falta un campo en el JSON queda en su valor por defecto
+  (`Guid.Empty`, 0, null). `ReservationRequestedMessageValidator` exige ids no vacíos,
+  `requestedAt`, importe mayor que cero y moneda de 3 letras. El consumidor manda los
+  mensajes inválidos a dead-letter y el procesador los rechaza como segunda barrera, sin
+  persistir ni cobrar.
 - **Competing consumers:** todas las réplicas leen la suscripción `booking` y cada
   mensaje lo procesa una sola.
 - **Completar después de guardar:** `AutoCompleteMessages = false`. Si hay un error,

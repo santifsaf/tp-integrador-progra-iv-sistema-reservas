@@ -15,4 +15,10 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Booking.Business.Tests" />
   </ItemGroup>
+  <!-- DECISIÓN: el mensaje del broker no se copia en Booking. Se compila directamente
+       el archivo compartido de /contracts, el mismo que usa Availability para publicar,
+       así los dos servicios no pueden quedar con versiones distintas del contrato. -->
+  <ItemGroup>
+    <Compile Include="../../../contracts/events/ReservationRequestedMessage.cs" Link="Messages/ReservationRequestedMessage.cs" />
+  </ItemGroup>
 </Project>

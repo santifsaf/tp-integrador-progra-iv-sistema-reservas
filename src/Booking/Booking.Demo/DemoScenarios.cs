@@ -209,7 +209,8 @@ public sealed class DemoScenarios(
     // ---------------------------------------------------------------- helpers
 
     private ReservationRequestedMessage NewMessage(string seatLabel, Guid userId) =>
-        new(Guid.NewGuid(), seats.EventId, seats.SeatId(seatLabel), userId, DateTimeOffset.UtcNow);
+        new(Guid.NewGuid(), seats.EventId, seats.SeatId(seatLabel), userId, DateTimeOffset.UtcNow,
+            seats.PriceCents, seats.Currency);
 
     private async Task<ReservationRequestedMessage> SendAsync(string seatLabel, PaymentScenario scenario, Guid? userId = null)
     {

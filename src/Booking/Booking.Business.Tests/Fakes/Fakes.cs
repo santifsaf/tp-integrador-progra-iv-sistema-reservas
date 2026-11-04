@@ -12,6 +12,9 @@ internal sealed class FakePaymentClient(params PaymentResult[] results) : IPayme
 
     public int Calls => _calls;
 
+    // Cada reserva que llegó a ChargeAsync (para verificar el importe enviado).
+    public List<Reservation> Charged { get; } = [];
+
     // Permite simular cosas que pasan mientras Booking espera a Payment
     // (por ejemplo, que el job de vencimiento corra en el medio).
     public Func<Reservation, Task>? During { get; set; }
@@ -19,6 +22,7 @@ internal sealed class FakePaymentClient(params PaymentResult[] results) : IPayme
     public async Task<PaymentResult> ChargeAsync(Reservation reservation, CancellationToken ct)
     {
         var call = Interlocked.Increment(ref _calls);
+        lock (Charged) Charged.Add(reservation);
         if (During is not null) await During(reservation);
         return results[Math.Min(call, results.Length) - 1];
     }

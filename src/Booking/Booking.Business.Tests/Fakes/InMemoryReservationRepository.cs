@@ -127,6 +127,8 @@ internal sealed class InMemoryReservationRepository : IReservationRepository
         UserId = r.UserId,
         EventId = r.EventId,
         SeatId = r.SeatId,
+        AmountCents = r.AmountCents,
+        Currency = r.Currency,
         Status = r.Status,
         RejectionReason = r.RejectionReason,
         CreatedAt = r.CreatedAt,

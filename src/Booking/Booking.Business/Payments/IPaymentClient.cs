@@ -10,9 +10,12 @@ namespace Booking.Business.Payments;
 //
 // Para Santi, al implementarla:
 //   - Usar un deadline en la llamada (por ejemplo 5 s).
-//   - Mandar reservation.Id como clave de idempotencia: Booking puede volver a pedir el
-//     cobro de la misma reserva (reintentos) y Payment no debe cobrar dos veces.
-//     Acordarlo con Agus y Juan en el .proto (payments.reservation_id UNIQUE).
+//   - El ChargeRequest del .proto se arma desde la reserva (ver ReservationPaymentClient):
+//       reservation_id       = reservation.Id
+//       payment_operation_id = reservation.Id   (siempre el mismo en los reintentos:
+//                                                es la clave de idempotencia de Payment)
+//       amount_cents         = reservation.AmountCents  (copiado del mensaje del broker)
+//       currency             = reservation.Currency
 //   - Cómo mapear la respuesta (ver PaymentResult):
 //       respuesta PAYMENT_SUCCEEDED                   -> Succeeded
 //       respuesta PAYMENT_REJECTED                    -> Failed
