@@ -8,7 +8,7 @@ namespace Availability.Infrastructure.Tests;
 public sealed class PostgreSqlFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+        .WithImage("postgres:17-alpine")
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();

@@ -35,7 +35,7 @@ Fuera de alcance: casos de uso, DTO de Application y entidades (Feli), endpoints
 |---|---|---|
 | Framework | `net10.0` | Confirmado |
 | Base de datos | PostgreSQL, una base por servicio | Confirmado |
-| Versión de la imagen de PostgreSQL | `postgres:16` para Availability | Acordado (2026-11-03) |
+| Versión de la imagen de PostgreSQL | `postgres:17` para Availability | Acordado (2026-11-04) |
 | ORM y provider | EF Core con `Npgsql.EntityFrameworkCore.PostgreSQL` | Confirmado |
 | Broker | Azure Service Bus (topic `grupo5-booking-topic`, suscripción `booking`) | Confirmado |
 | Servidor de autorización | Keycloak 26.4, realm `seat-reservation`, puerto `8081` | Confirmado |
