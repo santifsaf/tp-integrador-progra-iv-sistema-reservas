@@ -1,14 +1,18 @@
-
+using Payment.Business.Exceptions;
+using Payment.Business.Dtos;
+using Payment.Business.Services;
+using Payment.Data.Entities;
 using Grpc.Core;
 using Payment.Grpc.Services;
 using SeatReservation.Contracts.Payment;
 using Xunit;
+using BusinessPaymentStatus = Payment.Data.Entities.PaymentStatus;
 
 namespace Payment.Tests;
 
 public sealed class PaymentGrpcServiceValidationTests
 {
-    private readonly PaymentGrpcService _service = new();
+    private readonly PaymentGrpcService _service = new(new FakePaymentService());
 
     private const string ValidReservationId =
         "11111111-1111-1111-1111-111111111111";
@@ -89,26 +93,38 @@ public sealed class PaymentGrpcServiceValidationTests
     }
 
     [Fact]
-    public async Task Charge_ValidRequest_ReachesBusinessIntegration()
+    public async Task Charge_ValidRequest_ReturnsSuccessfulPayment()
     {
         var request = CreateValidChargeRequest();
 
-        await AssertStatusAsync(
-            () => _service.Charge(request, null!),
-            StatusCode.Unimplemented);
+        var response = await _service.Charge(request, null!);
+
+        Assert.Equal(
+            "33333333-3333-3333-3333-333333333333",
+            response.PaymentId);
+
+        Assert.Equal(
+            SeatReservation.Contracts.Payment.PaymentStatus.PaymentSucceeded,
+            response.Status);
     }
 
     [Fact]
-    public async Task GetPayment_ValidRequest_ReachesBusinessIntegration()
+    public async Task GetPayment_ValidRequest_ReturnsSuccessfulPayment()
     {
         var request = new GetPaymentRequest
         {
             PaymentOperationId = ValidOperationId
         };
 
-        await AssertStatusAsync(
-            () => _service.GetPayment(request, null!),
-            StatusCode.Unimplemented);
+        var response = await _service.GetPayment(request, null!);
+
+        Assert.Equal(
+            "33333333-3333-3333-3333-333333333333",
+            response.PaymentId);
+
+        Assert.Equal(
+            SeatReservation.Contracts.Payment.PaymentStatus.PaymentSucceeded,
+            response.Status);
     }
 
     private static ChargeRequest CreateValidChargeRequest()
@@ -138,5 +154,66 @@ public sealed class PaymentGrpcServiceValidationTests
             await Assert.ThrowsAsync<RpcException>(action);
 
         Assert.Equal(expectedStatus, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task Charge_ConflictingOperationId_ReturnsAlreadyExists()
+    {
+        var service = new PaymentGrpcService(
+            new FakePaymentService(throwConflict: true));
+
+        var request = CreateValidChargeRequest();
+
+        await AssertStatusAsync(
+            () => service.Charge(request, null!),
+            StatusCode.AlreadyExists);
+    }
+
+    [Fact]
+    public async Task GetPayment_UnknownOperationId_ReturnsNotFound()
+    {
+        var service = new PaymentGrpcService(
+            new FakePaymentService(paymentNotFound: true));
+
+        var request = new GetPaymentRequest
+        {
+            PaymentOperationId = ValidOperationId
+        };
+
+        await AssertStatusAsync(
+            () => service.GetPayment(request, null!),
+            StatusCode.NotFound);
+    }
+
+    private sealed class FakePaymentService(
+    bool throwConflict = false,
+    bool paymentNotFound = false) : IPaymentService
+    {
+        public Task<PaymentResultDto> ChargeAsync(ChargeRequestDto request)
+        {
+            if (throwConflict)
+            {
+                throw new PaymentConflictException(request.OperationId);
+            }
+
+            return Task.FromResult(new PaymentResultDto
+            {
+                PaymentId = "33333333-3333-3333-3333-333333333333",
+                Status = BusinessPaymentStatus.SUCCEEDED
+            });
+        }
+
+        public Task<PaymentResultDto?> GetPaymentAsync(string operationId)
+        {
+            if (paymentNotFound)
+            {
+                return Task.FromResult<PaymentResultDto?>(null);
+            }
+            return Task.FromResult<PaymentResultDto?>(new PaymentResultDto
+            {
+                PaymentId = "33333333-3333-3333-3333-333333333333",
+                Status = BusinessPaymentStatus.SUCCEEDED
+            });
+        }
     }
 }

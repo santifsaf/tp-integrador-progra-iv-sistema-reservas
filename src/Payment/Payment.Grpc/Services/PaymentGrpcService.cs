@@ -1,20 +1,28 @@
-﻿
-
+﻿using IPaymentBusinessService = Payment.Business.Services.IPaymentService;
 using Grpc.Core;
 using SeatReservation.Contracts.Payment;
+using Payment.Business.Exceptions;
 
 namespace Payment.Grpc.Services;
 
 public class PaymentGrpcService : PaymentService.PaymentServiceBase
 {
-    public override Task<ChargeResponse> Charge(
+    private readonly IPaymentBusinessService _paymentService;
+
+    public PaymentGrpcService(IPaymentBusinessService paymentService)
+    {
+        _paymentService = paymentService;
+    }
+
+    public override async Task<ChargeResponse> Charge(
         ChargeRequest request,
         ServerCallContext context)
     {
-        // Validaciones de la solicitud.
+        // Validar los identificadores.
         ValidateGuid(request.ReservationId, "reservation_id");
         ValidateGuid(request.PaymentOperationId, "payment_operation_id");
 
+        // Validar el importe.
         if (request.AmountCents <= 0)
         {
             throw new RpcException(
@@ -23,6 +31,7 @@ public class PaymentGrpcService : PaymentService.PaymentServiceBase
                     "amount_cents debe ser mayor que cero."));
         }
 
+        // Validar la moneda.
         if (request.Currency.Length != 3 ||
             request.Currency.Any(c => c < 'A' || c > 'Z'))
         {
@@ -32,25 +41,48 @@ public class PaymentGrpcService : PaymentService.PaymentServiceBase
                     "currency debe tener tres letras mayúsculas, por ejemplo ARS."));
         }
 
-        // Pendiente: conectar con Payment.Business de Juan.
-        throw new RpcException(
-            new Status(
-                StatusCode.Unimplemented,
-                "Charge pendiente de integración con Payment.Business."));
+        // Transformar la solicitud al DTO de Business.
+        var businessRequest = PaymentGrpcMapper.ToBusinessRequest(request);
+
+        try
+        {
+            // Procesar el cobro.
+            var result = await _paymentService.ChargeAsync(businessRequest);
+
+            // Transformar la respuesta a gRPC.
+            return PaymentGrpcMapper.ToGrpcResponse(result);
+        }
+        catch (PaymentConflictException)
+        {
+            throw new RpcException(
+                new Status(
+                    StatusCode.AlreadyExists,
+                    "payment_operation_id ya existe con datos diferentes."));
+        }
     }
 
-    public override Task<ChargeResponse> GetPayment(
-        GetPaymentRequest request,
-        ServerCallContext context)
+
+
+
+    public override async Task<ChargeResponse> GetPayment(
+    GetPaymentRequest request,
+    ServerCallContext context)
     {
-        // Validar el identificador de la operación.
+        // Validar el identificador antes de consultar Business.
         ValidateGuid(request.PaymentOperationId, "payment_operation_id");
 
-        // Pendiente: conectar con Payment.Business de Juan.
-        throw new RpcException(
-            new Status(
-                StatusCode.Unimplemented,
-                "GetPayment pendiente de integración con Payment.Business."));
+        var result = await _paymentService.GetPaymentAsync(
+            request.PaymentOperationId);
+
+        if (result is null)
+        {
+            throw new RpcException(
+                new Status(
+                    StatusCode.NotFound,
+                    "No se encontró el pago solicitado."));
+        }
+
+        return PaymentGrpcMapper.ToGrpcResponse(result);
     }
 
     private static void ValidateGuid(string value, string fieldName)
