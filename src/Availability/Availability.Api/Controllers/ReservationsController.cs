@@ -36,7 +36,7 @@ public class ReservationsController : ControllerBase
     /// Crea una nueva solicitud de reserva para un asiento específico.
     /// Responde inmediatamente con 202 Accepted sin esperar procesamiento asincrónico.
     /// </summary>
-    /// <param name="request">DTO con EventId y SeatId (ambos como int del servicio público)</param>
+    /// <param name="request">DTO con EventId y SeatId (ambos como guid del servicio público)</param>
     /// <param name="cancellationToken">Token de cancelación</param>
     /// <returns>
     /// 202 Accepted: Solicitud aceptada, contiene RequestId para seguimiento posterior
@@ -57,8 +57,8 @@ public class ReservationsController : ControllerBase
     /// Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cC...
     /// 
     /// {
-    ///   "eventId": 15,
-    ///   "seatId": 42
+    ///   "eventId": "a4f1b8e0-8902-4b21-9a2f-1c3d5e7f9b0a",
+    ///   "seatId": "c3d5e7f9-b0a4-4f1b-8e08-9024b219a2f"
     /// }
     /// ```
     /// 
@@ -116,16 +116,16 @@ public class ReservationsController : ControllerBase
         _logger.LogInformation(
             "Creando solicitud de reserva | UserId={UserId} | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
             userId,
-            request.EventId,
-            request.SeatId,
+            request.EventId!.Value,
+            request.SeatId!.Value,
             correlationIdLog);
 
         try
         {
             var result = await _createReservationRequestUseCase.ExecuteAsync(
                 userId,
-                request.EventId,
-                request.SeatId,
+                request.EventId!.Value,
+                request.SeatId!.Value,
                 cancellationToken);
 
             // Manejar resultado fallido
@@ -135,8 +135,8 @@ public class ReservationsController : ControllerBase
                     "Fallo al crear solicitud de reserva | Error={Error} | UserId={UserId} | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
                     result.Error,
                     userId,
-                    request.EventId,
-                    request.SeatId,
+                    request.EventId!.Value,
+                    request.SeatId!.Value,
                     correlationIdLog);
 
                 if (result.Error == AppError.NotFound)
@@ -185,8 +185,8 @@ public class ReservationsController : ControllerBase
                 _logger.LogError(
                     "Resultado exitoso pero valor nulo | UserId={UserId} | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
                     userId,
-                    request.EventId,
-                    request.SeatId,
+                    request.EventId!.Value,
+                    request.SeatId!.Value,
                     correlationIdLog);
 
                 var errorResponse = new ErrorResponse(
@@ -210,8 +210,8 @@ public class ReservationsController : ControllerBase
                 "Solicitud de reserva creada exitosamente | RequestId={RequestId} | UserId={UserId} | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
                 response.RequestId,
                 userId,
-                request.EventId,
-                request.SeatId,
+                request.EventId!.Value,
+                request.SeatId!.Value,
                 correlationIdLog);
 
             return Accepted($"/api/reservations/{response.RequestId}", response);
@@ -222,8 +222,8 @@ public class ReservationsController : ControllerBase
             _logger.LogWarning(
                 "Solicitud de reserva cancelada | UserId={UserId} | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
                 userId,
-                request.EventId,
-                request.SeatId,
+                request.EventId!.Value,
+                request.SeatId!.Value,
                 correlationId);
             var errorResponse = new ErrorResponse(
                 "REQUEST_TIMEOUT",
@@ -238,8 +238,8 @@ public class ReservationsController : ControllerBase
                 ex,
                 "Error no controlado al crear solicitud de reserva | UserId={UserId} | EventId={EventId} | SeatId={SeatId} | CorrelationId={CorrelationId}",
                 userId,
-                request.EventId,
-                request.SeatId,
+                request.EventId!.Value,
+                request.SeatId!.Value,
                 correlationId);
             var errorResponse = new ErrorResponse(
                 "INTERNAL_SERVER_ERROR",

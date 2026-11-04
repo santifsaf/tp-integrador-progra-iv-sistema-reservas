@@ -14,14 +14,14 @@ namespace Availability.Api.Controllers;
 [Produces("application/json")]
 public class SeatAvailabilityController : ControllerBase
 {
-    private readonly IGetSeatsAvailabilityUseCase _getSeatsAvailabilityUseCase;
+    private readonly IGetSeatMapUseCase _getSeatMapUseCase;
     private readonly ILogger<SeatAvailabilityController> _logger;
 
     public SeatAvailabilityController(
-        IGetSeatsAvailabilityUseCase getSeatsAvailabilityUseCase,
+        IGetSeatMapUseCase getSeatMapUseCase,
         ILogger<SeatAvailabilityController> logger)
     {
-        _getSeatsAvailabilityUseCase = getSeatsAvailabilityUseCase;
+        _getSeatMapUseCase = getSeatMapUseCase;
         _logger = logger;
     }
 
@@ -56,7 +56,7 @@ public class SeatAvailabilityController : ControllerBase
         try
         {
             // Delegar en el caso de uso
-            var result = await _getSeatsAvailabilityUseCase.ExecuteAsync(eventId, cancellationToken);
+            var result = await _getSeatMapUseCase.ExecuteAsync(eventId, cancellationToken);
 
             // Manejar resultado fallido
             if (!result.IsSuccess)

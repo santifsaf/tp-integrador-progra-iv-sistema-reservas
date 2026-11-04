@@ -8,14 +8,16 @@ namespace Availability.Api.DTOs.Requests;
 public class CreateReservationRequest
 {
     /// <summary>
-    /// Identificador del evento (Guid).
+    /// Identificador del evento (Guid nullable).
+    /// El [Required] valida que no sea null; si no viene el campo o es null se rechaza.
     /// </summary>
     [Required(ErrorMessage = "EventId es requerido")]
-    public Guid EventId { get; set; }
+    public Guid? EventId { get; set; }
 
     /// <summary>
-    /// Identificador del asiento a reservar (Guid).
+    /// Identificador del asiento a reservar (Guid nullable).
+    /// El [Required] valida que no sea null; si no viene el campo o es null se rechaza.
     /// </summary>
     [Required(ErrorMessage = "SeatId es requerido")]
-    public Guid SeatId { get; set; }
+    public Guid? SeatId { get; set; }
 }

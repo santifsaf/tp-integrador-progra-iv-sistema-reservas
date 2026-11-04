@@ -4,9 +4,9 @@ using Availability.Application.Dtos;
 namespace Availability.Application.Abstractions;
 
 /// <summary>
-/// Contrato para el caso de uso de obtener disponibilidad de asientos.
+/// Contrato para el caso de uso de obtener el mapa de asientos de un evento.
 /// </summary>
-public interface IGetSeatsAvailabilityUseCase
+public interface IGetSeatMapUseCase
 {
     /// <summary>
     /// Obtiene el mapa de asientos disponibles para un evento específico.

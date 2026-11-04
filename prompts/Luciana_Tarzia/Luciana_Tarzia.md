@@ -582,3 +582,37 @@ En Availability.Api/appsettings.json cambiar "Audience": "availability", sino no
 
  ```
  ### Resultado Entregado: Correcciones hechas.  
+
+
+ ## Prompt 19: subir servicio a docker
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante review de cambios
+
+### Contenido del Prompt Original:
+ 
+ ```
+debo subir mi servicio abailability.api a docker-compose. ejecuta cambios necesarios para extraer los valores con fallback y luego usar las variables extraidas.
+
+ ```
+ ### Resultado Entregado:
+	•	Si existe appsettings.json → lo usa (desarrollo local)
+	•	Si no existe pero hay variables de entorno → las usa (Docker)
+
+
+ ## Prompt 20: code review changes
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante review de cambios
+
+### Contenido del Prompt Original:
+ 
+ ```
+hay un wrapper (GetSeatsAvailabilityUseCase) que solo llama a GetSeatMapUseCase, sin lógica adicional. eliminar el wrapper completamente
+[Required] sobre Guid no nullable no funciona bien. si no viene, queda Guid.Empty -> corregir
+
+ ```
+ ### Resultado Entregado:
+•	El controller (SeatAvailabilityController) ahora inyecta directamente IGetSeatMapUseCase
+•	GetSeatMapUseCase implementa IGetSeatMapUseCase (interfaz)
+• El [Required] ahora funciona correctamente: valida que no sea null.

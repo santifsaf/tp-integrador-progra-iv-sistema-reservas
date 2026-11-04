@@ -4,7 +4,12 @@ using Availability.Application.Dtos;
 
 namespace Availability.Application.UseCases;
 
-public class GetSeatMapUseCase
+/// <summary>
+/// Caso de uso para obtener el mapa de asientos disponibles de un evento específico.
+/// Consulta el repositorio de eventos y asientos, y luego consulta el servicio externo
+/// de Booking para determinar qué asientos están ocupados.
+/// </summary>
+public class GetSeatMapUseCase : IGetSeatMapUseCase
 {
     private const string Available = "AVAILABLE";
     private const string Occupied = "OCCUPIED";
