@@ -31,8 +31,13 @@ try
 {
     Log.Information("Iniciando aplicación Availability.Api");
 
-    // Obtener configuración de JWT desde appsettings.json
+    // Obtener configuración de JWT desde appsettings.json o variables de entorno
     var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+
+    // En Docker, obtener valores de variables de entorno
+    var authority = jwtSettings["Authority"] ?? builder.Configuration["JwtSettings:Authority"];
+    var audience = jwtSettings["Audience"] ?? builder.Configuration["JwtSettings:Audience"];
+    var requireHttpsMetadata = bool.Parse(jwtSettings["RequireHttpsMetadata"] ?? "true");
 
     builder.Services.AddControllers();
 
@@ -48,9 +53,9 @@ try
         })
         .AddJwtBearer(options =>
         {
-            options.Authority = jwtSettings["Authority"];
-            options.Audience = jwtSettings["Audience"];
-            options.RequireHttpsMetadata = bool.Parse(jwtSettings["RequireHttpsMetadata"] ?? "true");
+            options.Authority = authority;
+            options.Audience = audience;
+            options.RequireHttpsMetadata = requireHttpsMetadata;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = bool.Parse(jwtSettings["ValidateIssuerSigningKey"] ?? "true"),
