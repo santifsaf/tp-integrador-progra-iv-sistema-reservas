@@ -18,6 +18,9 @@ public sealed class PostgresFixture : IAsyncLifetime
             ?? "Server=localhost;Port=5432;Database=booking_tests;User Id=booking;Password=booking;";
     }
 
+    // Cadena de la base de pruebas, para los tests que arman su propio proveedor de servicios:
+    public string ConnectionString => _connectionString;
+
     public async Task InitializeAsync()
     {
         // Protección: verifica que sea la base de pruebas, no sea que borremos la de desarrollo.
