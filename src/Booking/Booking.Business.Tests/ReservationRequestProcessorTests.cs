@@ -16,6 +16,7 @@ public class ReservationRequestProcessorTests
     private static readonly Guid EventId = Guid.NewGuid();
     private static readonly Guid SeatId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
+    private const long AmountCents = 1_500_050; // $15.000,50
 
     private readonly InMemoryReservationRepository _repository = new();
     private readonly FakeEventPublisher _publisher = new();
@@ -33,7 +34,7 @@ public class ReservationRequestProcessorTests
         new(_repository, _clock, NullLogger<ReservationExpirationService>.Instance);
 
     private static ReservationRequestedMessage NewRequest() =>
-        new(Guid.NewGuid(), EventId, SeatId, UserId, DateTimeOffset.UtcNow);
+        new(Guid.NewGuid(), EventId, SeatId, UserId, DateTimeOffset.UtcNow, AmountCents, "ARS");
 
     private Reservation SeedHeld(ReservationRequestedMessage request)
     {
@@ -81,6 +82,30 @@ public class ReservationRequestProcessorTests
                 (ReservationEventType.ReservationConfirmed, reservation.Id),
             },
             _publisher.Published);
+    }
+
+    [Fact]
+    public async Task NewReservation_KeepsTheAmountAndCurrencyFromTheMessage()
+    {
+        var reservation = await CreateProcessor(new FakePaymentClient(PaymentResult.Succeeded))
+            .ProcessAsync(NewRequest(), CancellationToken.None);
+
+        var saved = Assert.Single(_repository.All);
+        Assert.Equal(AmountCents, saved.AmountCents);
+        Assert.Equal("ARS", saved.Currency);
+        Assert.Equal(AmountCents, reservation.AmountCents);
+    }
+
+    [Fact]
+    public async Task PaymentIsChargedWithTheReservationAmount()
+    {
+        var payment = new FakePaymentClient(PaymentResult.Succeeded);
+
+        await CreateProcessor(payment).ProcessAsync(NewRequest(), CancellationToken.None);
+
+        var charged = Assert.Single(payment.Charged);
+        Assert.Equal(AmountCents, charged.AmountCents);
+        Assert.Equal("ARS", charged.Currency);
     }
 
     // ---------- Rechazos ----------

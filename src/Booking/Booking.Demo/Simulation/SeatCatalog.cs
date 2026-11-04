@@ -8,6 +8,11 @@ public sealed class SeatCatalog
 
     public string EventName => "Recital de prueba";
 
+    // Precio fijo por evento, como acordó el grupo: $15.000,00 en centavos.
+    public long PriceCents => 1_500_000;
+
+    public string Currency => "ARS";
+
     private readonly Dictionary<string, Guid> _byLabel =
         Enumerable.Range(1, 10).ToDictionary(i => $"A{i}", _ => Guid.NewGuid(), StringComparer.OrdinalIgnoreCase);
 

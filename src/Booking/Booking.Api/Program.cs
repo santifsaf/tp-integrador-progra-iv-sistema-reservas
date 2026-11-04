@@ -1,4 +1,5 @@
 using Booking.Api.Errors;
+using Booking.Api.Messaging;
 using Booking.Api.Payments;
 using Booking.Api.Security;
 using Booking.Business.Queries;
@@ -23,6 +24,22 @@ else if (!builder.Environment.IsEnvironment("Testing"))
 {
     // Fallar al arrancar es mejor que responder 503 en producción sin saber por qué.
     throw new InvalidOperationException("Falta la connection string 'ConnectionStrings:Booking'.");
+}
+
+// Procesamiento de reservas (pasos 4 a 8): consumidor de Azure Service Bus, lógica de
+// negocio y job de vencimiento. Necesita IReservationRepository (AddBookingData) e
+// IPaymentClient (AddPaymentCommunication), registrados arriba.
+// Igual que la base: sin la connection string del broker, fuera de Testing, la API no
+// arranca, porque Booking sin broker no procesa ninguna reserva. En Testing no se
+// registra, así las pruebas de la API no necesitan Azure.
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Broker:ConnectionString"]))
+{
+    builder.Services.AddReservationRequestConsumer(builder.Configuration);
+}
+else if (!builder.Environment.IsEnvironment("Testing"))
+{
+    throw new InvalidOperationException(
+        "Falta 'Broker:ConnectionString'. Pasarla con dotnet user-secrets o con la variable de entorno Broker__ConnectionString.");
 }
 
 // Composition root: IReservationRepository se registra arriba con AddBookingData cuando hay

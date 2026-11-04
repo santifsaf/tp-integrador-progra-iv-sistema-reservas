@@ -85,7 +85,15 @@ internal sealed class ReservationRequestedConsumer(
 
         // DECISIÓN: un mensaje mal formado no se va a arreglar reintentando, así que va
         // directo a la dead-letter queue (cola de mensajes muertos) para revisarlo a mano.
-        if (request is null || request.RequestId == Guid.Empty)
+        // También se descartan los mensajes sin un importe cobrable: Payment no acepta
+        // importes en cero o negativos ni monedas que no sean un código de 3 letras, así
+        // que reintentarlos no serviría. Mejor detectarlo acá que dejar la reserva retenida
+        // reintentando el cobro hasta que venza.
+        if (request is null
+            || request.RequestId == Guid.Empty
+            || request.AmountCents <= 0
+            || request.Currency is not { Length: 3 }
+            || request.Currency.Any(c => c is < 'A' or > 'Z'))
         {
             await args.DeadLetterMessageAsync(
                 message,

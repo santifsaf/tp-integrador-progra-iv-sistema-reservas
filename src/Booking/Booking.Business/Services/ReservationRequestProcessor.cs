@@ -78,6 +78,11 @@ public sealed class ReservationRequestProcessor(
             UserId = request.UserId,
             EventId = request.EventId,
             SeatId = request.SeatId,
+            // El importe y la moneda se copian del mensaje y quedan fijos en la reserva:
+            // todos los intentos de cobro de esta reserva usan el mismo importe, aunque
+            // el precio del evento cambie después en Availability.
+            AmountCents = request.AmountCents,
+            Currency = request.Currency,
             Status = ReservationStatus.Held,
             ExpiresAt = now + _options.HoldDuration,
             CreatedAt = now,

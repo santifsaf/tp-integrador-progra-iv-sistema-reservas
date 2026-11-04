@@ -103,6 +103,7 @@ public sealed class InMemoryReservationRepository : IReservationRepository
     private static Reservation Copy(Reservation r) => new()
     {
         Id = r.Id, RequestId = r.RequestId, UserId = r.UserId, EventId = r.EventId, SeatId = r.SeatId,
+        AmountCents = r.AmountCents, Currency = r.Currency,
         Status = r.Status, RejectionReason = r.RejectionReason,
         CreatedAt = r.CreatedAt, ExpiresAt = r.ExpiresAt, UpdatedAt = r.UpdatedAt,
     };
