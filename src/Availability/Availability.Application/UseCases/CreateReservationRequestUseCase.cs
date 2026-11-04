@@ -6,7 +6,7 @@ using Availability.Domain.Enums;
 
 namespace Availability.Application.UseCases;
 
-public class CreateReservationRequestUseCase
+public class CreateReservationRequestUseCase : ICreateReservationRequestUseCase
 {
     private readonly ISeatRepository _seatRepository;
     private readonly IReservationRequestRepository _reservationRequestRepository;

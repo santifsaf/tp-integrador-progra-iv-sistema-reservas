@@ -28,7 +28,31 @@ services:
           "CMD-SHELL",
           "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3",
         ]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
+           interval: 10s
+           timeout: 5s
+           retries: 30
+           start_period: 30s
+
+      availability-api:
+        build:
+          context: ..
+          dockerfile: src/Availability/Availability.Api/Dockerfile
+        environment:
+          - ASPNETCORE_ENVIRONMENT=Docker
+          - ASPNETCORE_URLS=http://+:8080
+          - JwtSettings__Authority=http://keycloak:8081
+          - JwtSettings__Audience=availability-api
+          - JwtSettings__RequireHttpsMetadata=false
+        ports:
+          - "5100:8080"
+        depends_on:
+          keycloak:
+            condition: service_healthy
+        networks:
+          - default
+        healthcheck:
+          test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+          interval: 10s
+          timeout: 5s
+          retries: 5
+          start_period: 10s
