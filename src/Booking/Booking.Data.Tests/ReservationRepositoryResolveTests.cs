@@ -216,35 +216,56 @@ public class ReservationRepositoryResolveTests
     [Fact]
     public async Task Carrera_DiezTareasEnParalelo_SoloUnaLograActualizar()
     {
-        await _fixture.ResetAsync();
-
-        var held = TestData.BuildHeldReservation(expiresAt: FixedNow.AddMinutes(1));
-        await using var ctx = _fixture.CreateContext();
-        ctx.Add(held);
-        await ctx.SaveChangesAsync();
-
-        using var gate = new System.Threading.CountdownEvent(10);
-
-        var tasks = Enumerable.Range(0, 10).Select(i => Task.Run(async () =>
+        // Esta prueba se repite 20 veces con reservas distintas para que la carrera
+        // ocurra de verdad cada vez, sin depender del scheduler.
+        for (int scenario = 0; scenario < 20; scenario++)
         {
-            gate.Signal();
-            gate.Wait();
+            await _fixture.ResetAsync();
 
-            await using var taskCtx = _fixture.CreateContext();
-            var repo = new ReservationRepository(taskCtx);
-            var to = i % 2 == 0 ? ReservationStatus.Confirmed : ReservationStatus.Rejected;
-            RejectionReason? reason = i % 2 == 0 ? null : RejectionReason.PaymentUnavailable;
-            return await repo.TryResolveHeldAsync(held.Id, to, reason, FixedNow, CancellationToken.None);
-        })).ToList();
+            var held = TestData.BuildHeldReservation(expiresAt: FixedNow.AddMinutes(1));
+            await using var seedCtx = _fixture.CreateContext();
+            seedCtx.Add(held);
+            await seedCtx.SaveChangesAsync();
 
-        var results = await Task.WhenAll(tasks);
+            // TaskCompletionSource sin bloqueo: RunContinuationsAsynchronously evita que
+            // las continuaciones se ejecuten en el hilo que llamó SetResult, permitiendo
+            // que el test continúe mientras las tareas aún esperan.
+            var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        Assert.Single(results, r => r);
-        Assert.Equal(9, results.Count(r => !r));
+            var tasks = Enumerable.Range(0, 10).Select(i => Task.Run(async () =>
+            {
+                await gate.Task;
 
-        await using var verifyCtx = _fixture.CreateContext();
-        var persisted = await verifyCtx.Reservations.FirstAsync(r => r.Id == held.Id);
-        Assert.True(persisted.Status is ReservationStatus.Confirmed or ReservationStatus.Rejected);
+                await using var taskCtx = _fixture.CreateContext();
+                var repo = new ReservationRepository(taskCtx);
+                var to = i % 2 == 0 ? ReservationStatus.Confirmed : ReservationStatus.Rejected;
+                RejectionReason? reason = i % 2 == 0 ? null : RejectionReason.PaymentUnavailable;
+                var result = await repo.TryResolveHeldAsync(held.Id, to, reason, FixedNow, CancellationToken.None);
+
+                // Devolver tupla con el destino intenta y si ganó.
+                return (targetStatus: to, reason, succeeded: result);
+            })).ToList();
+
+            gate.SetResult(true);
+            var results = await Task.WhenAll(tasks);
+
+            // Exactamente una tarea debe devolver succeeded = true.
+            var winners = results.Where(r => r.succeeded).ToList();
+            Assert.Single(winners);
+
+            var loser_count = results.Count(r => !r.succeeded);
+            Assert.Equal(9, loser_count);
+
+            // Leer la reserva con un contexto nuevo y verificar que el estado final
+            // coincide con el destino de la tarea que ganó.
+            await using var verifyCtx = _fixture.CreateContext();
+            var persisted = await verifyCtx.Reservations.FirstAsync(r => r.Id == held.Id);
+            var winner = winners[0];
+
+            Assert.Equal(winner.targetStatus, persisted.Status);
+            Assert.Equal(winner.reason, persisted.RejectionReason);
+            Assert.Equal(FixedNow, persisted.UpdatedAt);
+        }
     }
 
     [Fact]
