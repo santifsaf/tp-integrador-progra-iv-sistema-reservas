@@ -41,10 +41,8 @@ services:
     healthcheck:
       # La imagen no trae curl: se consulta /health/ready del puerto de management con bash.
       test:
-        [
-          "CMD-SHELL",
-          "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3",
-        ]
+        - CMD-SHELL
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"
       interval: 10s
       timeout: 5s
       retries: 30
@@ -70,6 +68,33 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  availability-api:
+    build:
+      context: ..
+      dockerfile: src/Availability/Availability.Api/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__AvailabilityDb=Host=availability-db;Port=5432;Database=${AVAILABILITY_DB_NAME:-availability};Username=${AVAILABILITY_DB_USER:-availability};Password=${AVAILABILITY_DB_PASSWORD:-availability}
+      - JwtSettings__Authority=http://keycloak:8081
+      - JwtSettings__Audience=availability-api
+      - JwtSettings__RequireHttpsMetadata=false
+    ports:
+      - "5100:8080"
+    depends_on:
+      availability-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   booking-db-data:
