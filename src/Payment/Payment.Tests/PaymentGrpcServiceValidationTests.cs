@@ -185,12 +185,41 @@ public sealed class PaymentGrpcServiceValidationTests
             StatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task Charge_ValidRequest_SendsCorrectDataToBusiness()
+    {
+        // Crear el servicio simulado.
+        var fakePaymentService = new FakePaymentService();
+
+        // Inyectarlo en nuestro servidor gRPC.
+        var service = new PaymentGrpcService(fakePaymentService);
+
+        // Preparar una solicitud válida.
+        var request = CreateValidChargeRequest();
+
+        // Ejecutar el método Charge.
+        await service.Charge(request, null!);
+
+        // Verificar que Business recibió la solicitud.
+        var businessRequest = fakePaymentService.LastChargeRequest;
+
+        Assert.NotNull(businessRequest);
+
+        Assert.Equal(request.ReservationId, businessRequest.ReservationId);
+        Assert.Equal(request.PaymentOperationId, businessRequest.OperationId);
+        Assert.Equal(request.AmountCents, businessRequest.AmountCents);
+        Assert.Equal(request.Currency, businessRequest.Currency);
+    }
+
     private sealed class FakePaymentService(
     bool throwConflict = false,
     bool paymentNotFound = false) : IPaymentService
     {
+        public ChargeRequestDto? LastChargeRequest { get; private set; }
         public Task<PaymentResultDto> ChargeAsync(ChargeRequestDto request)
         {
+            LastChargeRequest = request;
+
             if (throwConflict)
             {
                 throw new PaymentConflictException(request.OperationId);
