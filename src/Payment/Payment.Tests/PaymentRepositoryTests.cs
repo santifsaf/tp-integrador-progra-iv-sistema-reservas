@@ -23,7 +23,7 @@ namespace Payment.Tests
         public async Task TryAddAsync_MismoOperationId_NoDuplicados()
         {
             await using var db = NewContext();
-            await db.Database.EnsureCreatedAsync();
+            await db.Database.MigrateAsync();
             var repo = new PaymentRepository(db);
 
             var firts = await repo.TryAddAsync(NewPayment("op-1"));
@@ -41,7 +41,7 @@ namespace Payment.Tests
         public async Task TryAddAsync_MismoIdConDiferenteOperationId_ErrorReal()
         {
             await using var db = NewContext();
-            await db.Database.EnsureCreatedAsync();
+            await db.Database.MigrateAsync();
             var repo = new PaymentRepository(db);
 
             var original = NewPayment("op-2");
