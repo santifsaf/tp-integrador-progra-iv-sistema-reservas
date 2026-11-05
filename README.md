@@ -90,6 +90,36 @@ Dentro de Docker, los servicios llegan a Keycloak en `http://keycloak:8081` y en
 > - Variables de configuración necesarias
 > - Dónde el sistema se vuelve eventualmente consistente
 
+### Estados de una solicitud de reserva
+
+Los endpoints de `/api/reservations` usan siempre el mismo conjunto de estados:
+
+| Estado      | Significado                                        | Quién lo decide |
+| ----------- | -------------------------------------------------- | --------------- |
+| `PENDING`   | Solicitud publicada; Booking todavía no la procesó | Availability    |
+| `FAILED`    | La solicitud nunca llegó a Booking                 | Availability    |
+| `HELD`      | Asiento retenido mientras se procesa el pago       | Booking         |
+| `CONFIRMED` | Pago aprobado, reserva confirmada                  | Booking         |
+| `REJECTED`  | Reserva rechazada (asiento ocupado o pago fallido) | Booking         |
+| `EXPIRED`   | La retención venció sin confirmarse                | Booking         |
+
+Internamente, Availability guarda `Received`, `Published` o `PublishFailed` (`RequestStatus`). Esos valores no salen por la API: la traducción está en `Availability.Application/Common/RequestStatusNames.cs`.
+
+**Qué devuelve cada endpoint**
+
+- `POST /api/reservations`: `PENDING` (`202`). Si la publicación en Service Bus falla, responde `503` y la solicitud queda `FAILED`.
+- `GET /api/reservations/{requestId}`: el estado completo, más `description`, que puede ser `null`. Para `REJECTED`, la `description` explica el motivo (por ejemplo, `"El asiento está ocupado."`). Mientras la solicitud no está `FAILED`, siempre se consulta primero a Booking, así que el estado se actualiza solo cuando Booking procesa el mensaje.
+- `GET /api/reservations`: historial del usuario, solo con el estado local (`PENDING` o `FAILED`). No consulta a Booking; para el estado final hay que usar el endpoint anterior.
+
+**Solicitudes que no llegaron a publicarse**
+
+El `POST` guarda la solicitud como `Received`, la publica y después la marca `Published` (o `PublishFailed`). Si el proceso se cae entre esos pasos, queda en `Received` y hay dos casos:
+
+- **El mensaje llegó a salir:** Booking lo procesa y el `GET` por `requestId` muestra su estado.
+- **El mensaje no salió:** Booking nunca la va a tener. Si Booking responde `404` y pasaron más de 5 minutos desde la creación, el `GET` por `requestId` devuelve `FAILED` con `"La solicitud no llegó a publicarse"`.
+
+La regla se aplica al leer: no modifica la base ni reenvía la solicitud, porque el usuario ya recibió un error en el `POST` y reservarle el asiento después lo confundiría. Para reintentar, se crea una solicitud nueva.
+
 ## Booking
 
 > _A completar por el subgrupo Booking (Luis, Gian, Santi)._
