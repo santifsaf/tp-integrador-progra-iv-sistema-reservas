@@ -13,7 +13,7 @@ namespace Availability.Infrastructure.Tests;
 public sealed class BookingClientTests
 {
     [Fact]
-    public async Task GetOccupiedSeatIdsAsync_ReturnsOnlyOccupiedSeatsAndHandlesEmptyList()
+    public async Task GetOccupiedSeatIdsAsync_ReturnsGuidArrayAndHandlesEmptyList()
     {
         var occupiedSeatId = Guid.NewGuid();
         var freeSeatId = Guid.NewGuid();
@@ -21,7 +21,7 @@ public sealed class BookingClientTests
         var provider = CreateProvider(
             _ => Interlocked.Increment(ref occupiedResponseCount) == 1
                 ? JsonResponse(HttpStatusCode.OK,
-                    $"[{{\"seatId\":\"{occupiedSeatId}\",\"isOccupied\":true}},{{\"seatId\":\"{freeSeatId}\",\"isOccupied\":false}}]")
+                    $"[\"{occupiedSeatId}\"]")
                 : JsonResponse(HttpStatusCode.OK, "[]"));
         await using (provider)
         {
