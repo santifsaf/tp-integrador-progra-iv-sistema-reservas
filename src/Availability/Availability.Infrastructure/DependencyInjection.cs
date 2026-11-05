@@ -23,7 +23,7 @@ public static class DependencyInjection
             .Bind(configuration.GetSection("ServiceBus"))
             .Validate(
                 o => !string.IsNullOrWhiteSpace(o.ConnectionString) && !string.IsNullOrWhiteSpace(o.TopicName),
-                "Falta ServiceBus:ConnectionString o ServiceBus:TopicName. Local: dotnet user-secrets set \"ServiceBus:ConnectionString\" \"...\" --project src/Availability/Availability.Api. Docker: completar MSG_BROKER_CONNECTION_STRING en infra/.env. Ver infra/README_AVAILABILITY.md.")
+                "Falta ServiceBus:ConnectionString o ServiceBus:TopicName. Local: dotnet user-secrets set \"ServiceBus:ConnectionString\" \"...\" --project src/Availability/Availability.Api. Docker: completar MSG_BROKER_CONNECTION_STRING en infra/.env. Ver infra/README.md.")
             .ValidateOnStart();
         services.AddOptions<BookingClientOptions>()
             .Bind(configuration.GetSection("Booking"))
