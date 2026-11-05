@@ -16,18 +16,15 @@ public class SeatAvailabilityController : ControllerBase
 {
     private readonly IGetEventsUseCase _getEventsUseCase;
     private readonly IGetSeatMapUseCase _getSeatMapUseCase;
-    private readonly IGetAvailableSeatsUseCase _getAvailableSeatsUseCase;
     private readonly ILogger<SeatAvailabilityController> _logger;
 
     public SeatAvailabilityController(
         IGetEventsUseCase getEventsUseCase,
         IGetSeatMapUseCase getSeatMapUseCase,
-        IGetAvailableSeatsUseCase getAvailableSeatsUseCase,
         ILogger<SeatAvailabilityController> logger)
     {
         _getEventsUseCase = getEventsUseCase;
         _getSeatMapUseCase = getSeatMapUseCase;
-        _getAvailableSeatsUseCase = getAvailableSeatsUseCase;
         _logger = logger;
     }
 
@@ -198,98 +195,4 @@ public class SeatAvailabilityController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
         }
     }
-
-    /// <summary>
-    /// Obtiene la lista de todos los asientos disponibles para un evento específico.
-    /// Este endpoint devuelve SOLO los asientos sin información sobre ocupación.
-    /// La ocupación viene del servicio de Booking y se debe consultar por separado.
-    /// </summary>
-    /// <param name="eventId">Identificador del evento (Guid)</param>
-    /// <param name="cancellationToken">Token de cancelación</param>
-    /// <returns>
-    /// 200 OK: Lista de asientos disponibles (SeatId y Label)
-    /// 404 Not Found: Evento no encontrado
-    /// </returns>
-    [HttpGet("{eventId:guid}/available-seats")]
-    [ProducesResponseType(typeof(List<AvailableSeatDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<IReadOnlyList<AvailableSeatDto>>> GetAvailableSeats(
-        [FromRoute] Guid eventId,
-        CancellationToken cancellationToken)
-    {
-        var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
-
-        _logger.LogInformation(
-            "Obteniendo asientos disponibles | EventId={EventId} | CorrelationId={CorrelationId}",
-            eventId,
-            correlationId);
-
-        try
-        {
-            var result = await _getAvailableSeatsUseCase.ExecuteAsync(eventId, cancellationToken);
-
-            if (!result.IsSuccess)
-            {
-                _logger.LogWarning(
-                    "Fallo al obtener asientos disponibles | Error={Error} | EventId={EventId} | CorrelationId={CorrelationId}",
-                    result.Error,
-                    eventId,
-                    correlationId);
-
-                if (result.Error == AppError.NotFound)
-                {
-                    var errorResponse = new ErrorResponse(
-                        "EVENT_NOT_FOUND",
-                        "El evento especificado no existe",
-                        correlationId);
-                    return NotFound(errorResponse);
-                }
-
-                var internalErrorResponse = new ErrorResponse(
-                    "INTERNAL_ERROR",
-                    "Error al procesar la solicitud",
-                    correlationId);
-                return StatusCode(StatusCodes.Status500InternalServerError, internalErrorResponse);
-            }
-
-            var availableSeats = result.Value;
-
-            _logger.LogInformation(
-                "Asientos disponibles obtenidos | EventId={EventId} | Count={Count} | CorrelationId={CorrelationId}",
-                eventId,
-                availableSeats.Count,
-                correlationId);
-
-            return Ok(availableSeats);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogWarning(
-                "Solicitud cancelada | EventId={EventId} | CorrelationId={CorrelationId}",
-                eventId,
-                correlationId);
-
-            var errorResponse = new ErrorResponse(
-                "REQUEST_TIMEOUT",
-                "La solicitud expiró",
-                correlationId);
-
-            return StatusCode(StatusCodes.Status408RequestTimeout, errorResponse);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Error no controlado al obtener asientos disponibles | EventId={EventId} | CorrelationId={CorrelationId}",
-                eventId,
-                correlationId);
-
-            var errorResponse = new ErrorResponse(
-                "INTERNAL_SERVER_ERROR",
-                "Error interno del servidor",
-                correlationId);
-
-            return StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
-        }
     }
-}
