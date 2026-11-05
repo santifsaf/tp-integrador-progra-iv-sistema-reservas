@@ -11,13 +11,13 @@ La cadena de conexión se lee de la variable de entorno `PAYMENT_DB_CONNECTION_S
 PowerShell:
 
 ```powershell
-$env:PAYMENT_DB_CONNECTION = "Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment"
+$env:PAYMENT_DB_CONNECTION_STRING = "Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment"
 ```
 
 Bash:
 
 ```bash
-export PAYMENT_DB_CONNECTION="Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment"
+export PAYMENT_DB_CONNECTION_STRING ="Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment"
 ```
 
 Los valores del ejemplo corresponden al servicio `payment-db` del `docker-compose`.
@@ -38,4 +38,4 @@ La base debe ser nueva o tener ya el historial de migraciones.
 ```
 dotnet ef migrations add NombreDeLaMigracion --project src/Payment/Payment.Data
 ```
-(No necesita una base en ejecución, pero la variable `PAYMENT_DB_CONNECTION` debe estar definida.)
+(No necesita una base en ejecución, pero la variable `PAYMENT_DB_CONNECTION_STRING` debe estar definida.)
