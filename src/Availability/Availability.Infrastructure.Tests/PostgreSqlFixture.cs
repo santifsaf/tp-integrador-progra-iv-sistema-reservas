@@ -1,5 +1,6 @@
 using Availability.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -22,10 +23,20 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
     public async Task DisposeAsync() => await _container.DisposeAsync();
 
-    public AvailabilityDbContext CreateDbContext()
+    public AvailabilityDbContext CreateDbContext(string? databaseName = null)
     {
+        var connectionString = ConnectionString;
+        if (databaseName is not null)
+        {
+            var builder = new NpgsqlConnectionStringBuilder(connectionString)
+            {
+                Database = databaseName
+            };
+            connectionString = builder.ConnectionString;
+        }
+
         var options = new DbContextOptionsBuilder<AvailabilityDbContext>()
-            .UseNpgsql(ConnectionString)
+            .UseNpgsql(connectionString)
             .Options;
         return new AvailabilityDbContext(options);
     }

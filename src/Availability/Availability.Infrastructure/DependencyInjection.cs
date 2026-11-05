@@ -31,7 +31,9 @@ public static class DependencyInjection
         services.AddTransient<BookingAuthHandler>();
 
         services.AddDbContext<AvailabilityDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("AvailabilityDb")));
+            options.UseNpgsql(
+                configuration.GetConnectionString("AvailabilityDb"),
+                npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
 
         services.AddScoped<IReservationRequestRepository, ReservationRequestRepository>();
         services.AddScoped<IEventRepository, EventRepository>();
