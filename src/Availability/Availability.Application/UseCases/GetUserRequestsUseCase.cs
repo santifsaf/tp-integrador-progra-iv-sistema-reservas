@@ -5,7 +5,7 @@ using Availability.Domain.Enums;
 
 namespace Availability.Application.UseCases;
 
-public class GetUserRequestsUseCase
+public class GetUserRequestsUseCase : IGetUserRequestsUseCase
 {
     private const string Received = "RECEIVED";
     private const string Failed = "FAILED";

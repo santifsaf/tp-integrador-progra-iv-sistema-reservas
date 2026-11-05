@@ -634,3 +634,46 @@ se solicita integración con Availability.Infrastructure. Se debe:
  ```
  ### Resultado Entregado:
 	integración con infraestructura completada. Se agregó referencia a EF Core Design, se registró Availability.Infrastructure en Program.cs y se implementó la aplicación de migraciones al iniciar la app.
+
+
+## Prompt 22: agregar nuevos endpoints útiles
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante pruebas de la solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+crear nuevo endpoint para obtener eventos: GET api/events
+	1.	Crear interfaz IGetEventsUseCase (falta abstracción)
+	2.	Registrar la dependencia con interfaz en DependencyInjection.cs
+	3.	Agregar endpoint GET /api/events en SeatAvailabilityController
+		•	Llamar al caso de uso
+		•	Manejar errores (timeout, excepciones)
+
+ ```
+ ### Resultado Entregado:
+	nuevo endpoint get api/events
+
+
+## Prompt 23: agregar nuevos endpoints útiles
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante pruebas de la solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+crear nuevo endpoint para obtener reservas: GET api/reservations
+	1.	Crear interfaz IGetUserRequestsUseCase (falta abstracción)
+	2.	Registrar la dependencia con interfaz en DependencyInjection.cs
+	3.	Agregar endpoint GET /api/reservations en ReservationsController
+		•	Extraer userId del JWT (claim "sub")
+		•	Llamar al caso de uso
+		•	Manejar errores (timeout, excepciones)
+		•	Devolver UserRequestSummaryDto[] ordenado por fecha descendente
+	4.	Documentación: XML comments explicando que devuelve el historial del usuario autenticado
+
+ ```
+ ### Resultado Entregado:
+	nuevo endpoint get api/reservations

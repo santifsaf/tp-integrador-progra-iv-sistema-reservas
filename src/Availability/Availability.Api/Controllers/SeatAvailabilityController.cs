@@ -14,15 +14,64 @@ namespace Availability.Api.Controllers;
 [Produces("application/json")]
 public class SeatAvailabilityController : ControllerBase
 {
+    private readonly IGetEventsUseCase _getEventsUseCase;
     private readonly IGetSeatMapUseCase _getSeatMapUseCase;
     private readonly ILogger<SeatAvailabilityController> _logger;
 
     public SeatAvailabilityController(
+        IGetEventsUseCase getEventsUseCase,
         IGetSeatMapUseCase getSeatMapUseCase,
         ILogger<SeatAvailabilityController> logger)
     {
+        _getEventsUseCase = getEventsUseCase;
         _getSeatMapUseCase = getSeatMapUseCase;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Obtiene la lista de todos los eventos disponibles.
+    /// Este endpoint es útil para obtener eventos sin depender del servicio de Booking.
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelación</param>
+    /// <returns>
+    /// 200 OK: Lista de eventos disponibles ordenados por fecha de inicio
+    /// </returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(List<EventSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<EventSummaryDto>>> GetEvents(
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
+
+        _logger.LogInformation(
+            "Obteniendo lista de eventos | CorrelationId={CorrelationId}",
+            correlationId);
+
+        try
+        {
+            var events = await _getEventsUseCase.ExecuteAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Lista de eventos obtenida exitosamente | EventCount={EventCount} | CorrelationId={CorrelationId}",
+                events.Count,
+                correlationId);
+
+            return Ok(events);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error al obtener lista de eventos | CorrelationId={CorrelationId}",
+                correlationId);
+
+            var errorResponse = new ErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "Error al obtener eventos",
+                correlationId);
+
+            return StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
+        }
     }
 
     /// <summary>
