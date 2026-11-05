@@ -4,7 +4,7 @@ using Availability.Application.Dtos;
 
 namespace Availability.Application.UseCases;
 
-public class GetEventsUseCase
+public class GetEventsUseCase : IGetEventsUseCase
 {
     private readonly IEventRepository _eventRepository;
 
@@ -13,7 +13,7 @@ public class GetEventsUseCase
         _eventRepository = eventRepository;
     }
 
-    public async Task<Result<IReadOnlyList<EventSummaryDto>>> ExecuteAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<EventSummaryDto>> ExecuteAsync(CancellationToken ct)
     {
         var events = await _eventRepository.GetAllAsync(ct);
 
@@ -22,6 +22,6 @@ public class GetEventsUseCase
             .Select(e => new EventSummaryDto(e.Id, e.Name, e.StartsAt, e.PriceCents, e.Currency))
             .ToList();
 
-        return Result<IReadOnlyList<EventSummaryDto>>.Success(result);
+        return result;
     }
 }
