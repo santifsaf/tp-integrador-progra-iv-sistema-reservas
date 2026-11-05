@@ -29,6 +29,28 @@ public sealed class PaymentGrpcMapperTests
         Assert.Equal(request.Currency, result.Currency);
     }
 
+    [Fact]
+    public void ToBusinessRequest_NormalizesGuids()
+    {
+        var request = new ChargeRequest
+        {
+            ReservationId = "AABBCCDD-1111-2222-3333-444455556666",
+            PaymentOperationId = "FFEEDDCC-1111-2222-3333-444455556666",
+            AmountCents = 1000,
+            Currency = "ARS"
+        };
+
+        var result = PaymentGrpcMapper.ToBusinessRequest(request);
+
+        Assert.Equal(
+            "aabbccdd-1111-2222-3333-444455556666",
+            result.ReservationId);
+
+        Assert.Equal(
+            "ffeeddcc-1111-2222-3333-444455556666",
+            result.OperationId);
+    }
+
     [Theory]
     [InlineData(BusinessStatus.PENDING, GrpcStatus.PaymentPending)]
     [InlineData(BusinessStatus.SUCCEEDED, GrpcStatus.PaymentSucceeded)]

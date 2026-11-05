@@ -224,11 +224,31 @@ public sealed class PaymentGrpcServiceValidationTests
         Assert.Equal(request.Currency, businessRequest.Currency);
     }
 
+    [Theory]
+    [InlineData("AABBCCDD-1111-2222-3333-444455556666")]
+    [InlineData("aabbccdd-1111-2222-3333-444455556666")]
+    public async Task GetPayment_NormalizesOperationId(string operationId)
+    {
+        var fakePaymentService = new FakePaymentService();
+        var service = new PaymentGrpcService(fakePaymentService);
+
+        var request = new GetPaymentRequest
+        {
+            PaymentOperationId = operationId
+        };
+
+        await service.GetPayment(request, null!);
+
+        Assert.Equal(
+            "aabbccdd-1111-2222-3333-444455556666",
+            fakePaymentService.LastGetPaymentOperationId);
+    }
     private sealed class FakePaymentService(
      bool throwConflict = false,
      bool paymentNotFound = false,
      bool throwValidation = false) : IPaymentService
     {
+        public string? LastGetPaymentOperationId { get; private set; }
         public ChargeRequestDto? LastChargeRequest { get; private set; }
         public Task<PaymentResultDto> ChargeAsync(ChargeRequestDto request)
         {
@@ -252,6 +272,8 @@ public sealed class PaymentGrpcServiceValidationTests
 
         public Task<PaymentResultDto?> GetPaymentAsync(string operationId)
         {
+            LastGetPaymentOperationId = operationId;
+
             if (paymentNotFound)
             {
                 return Task.FromResult<PaymentResultDto?>(null);

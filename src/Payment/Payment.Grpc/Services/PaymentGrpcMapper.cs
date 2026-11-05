@@ -12,8 +12,8 @@ public static class PaymentGrpcMapper
     {
         return new ChargeRequestDto
         {
-            ReservationId = request.ReservationId,
-            OperationId = request.PaymentOperationId,
+            ReservationId = Guid.Parse(request.ReservationId).ToString("D"),
+            OperationId = Guid.Parse(request.PaymentOperationId).ToString("D"),
             AmountCents = request.AmountCents,
             Currency = request.Currency
         };

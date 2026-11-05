@@ -80,7 +80,7 @@ public class PaymentGrpcService : PaymentService.PaymentServiceBase
         ValidateGuid(request.PaymentOperationId, "payment_operation_id");
 
         var result = await _paymentService.GetPaymentAsync(
-            request.PaymentOperationId);
+            Guid.Parse(request.PaymentOperationId).ToString("D"));
 
         if (result is null)
         {
