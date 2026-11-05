@@ -481,7 +481,7 @@ El `KeycloakTokenProvider` se registra como singleton, para que la caché sea un
 
 `BookingClient` implementa `IBookingClient` y se registra en `AddInfrastructure` para usar el `HttpClient` nombrado `Booking`, con los handlers de autenticación y correlación.
 
-- `GetOccupiedSeatIdsAsync` consulta `GET api/events/{eventId}/occupied-seats`, deserializa los pares `seatId`/`isOccupied` y devuelve solo los identificadores ocupados. Una lista vacía en una respuesta exitosa devuelve un conjunto vacío.
+- `GetOccupiedSeatIdsAsync` consulta `GET api/events/{eventId}/occupied-seats`, deserializa un array JSON de GUIDs ocupados y devuelve ese conjunto. Un array vacío en una respuesta exitosa devuelve un conjunto vacío.
 - `GetStatusByRequestIdAsync` consulta `GET api/reservations/by-request/{requestId}` y envía el propio `requestId` en `X-Correlation-ID`. Un `404` devuelve `null`; una respuesta exitosa se deserializa a `BookingReservationStatusDto` (`status`, `description`).
 - Errores HTTP distintos del `404` de estado, fallos de transporte, timeouts o respuestas inválidas se exponen como `ExternalServiceUnavailableException`. La cancelación solicitada por el llamador se propaga.
 
@@ -615,7 +615,7 @@ Qué debe verificarse, independiente del framework, y a qué criterio de aceptac
 | `GetByUserIdAsync` devuelve solo las solicitudes del usuario | BR-14 |
 | El seed carga al menos un evento con asientos y es reproducible | BR-04 |
 | El publisher envía el JSON acordado con `MessageId` y `CorrelationId` iguales al `requestId` | BR-17, BR-19 |
-| El cliente devuelve los `seatId` con `isOccupied` en `true`, y vacío si Booking responde `200` con lista vacía | BR-25, BR-26 |
+| El cliente deserializa los GUIDs ocupados y devuelve un conjunto vacío si Booking responde `200` con `[]` | BR-25, BR-26 |
 | `GetStatusByRequestIdAsync` devuelve `null` con `404` y lanza `ExternalServiceUnavailableException` ante un error | BR-27, BR-28 |
 | El token se pide una sola vez mientras es válido y se envía en cada llamada | BR-29, BR-30 |
 

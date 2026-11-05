@@ -201,10 +201,17 @@ Ordenados por cuántas tareas destraban:
 |---|---|---|---|---|
 | **T4.1** | `KeycloakTokenProvider`: `client_credentials`, caché del token y renovación 30 segundos antes del vencimiento, con un semáforo para no pedir varios tokens a la vez. | F0 | **Implementada** | — |
 | **T4.2** | `BookingAuthHandler`: agrega `Authorization: Bearer` en cada llamada. | T4.1 | **Implementada** | — |
+<<<<<<< Updated upstream
 | **T4.3** | Configurar el token endpoint de Keycloak para Docker y desarrollo local, validando el issuer acordado. | U-12 | **Decisión resuelta; configuración de API pendiente con Luciana** | Docker: `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; local: `http://localhost:8081/realms/seat-reservation/protocol/openid-connect/token` |
 | **T4.4** | Fijar el nombre de la variable del secreto del client `availability` en el contenedor de Availability. | U-11 | **Convención resuelta; falta cablear al agregar la API al compose** | `Keycloak__ClientSecret: ${AVAILABILITY_CLIENT_SECRET}` |
 | **T4.5** | Fijar `Booking:BaseUrl`. | U-10 | **Decisión resuelta; configuración de API pendiente con Luciana** | Docker: `http://booking:8080/`; local: `http://localhost:5200/` |
 | **T4.6** | `BookingClient.GetOccupiedSeatIdsAsync`: `GET api/events/{eventId}/occupied-seats`, deserializa `[{ seatId, isOccupied }]` y devuelve los `seatId` con `isOccupied` en `true`; lista vacía con `200` significa "nada ocupado". Si Booking falla, lanza `ExternalServiceUnavailableException`. | T4.2 | **Implementada (2026-11-03)** | — |
+=======
+| **T4.3** | Configurar el token endpoint de Keycloak para Docker y desarrollo local, validando el issuer acordado. | U-12 | **Parcial:** endpoint e issuer acordados; falta mapear `Keycloak__TokenEndpoint` a `availability-api`. | Docker: `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; local: `http://localhost:8081/realms/seat-reservation/protocol/openid-connect/token` |
+| **T4.4** | Fijar el nombre de la variable del secreto del client `availability` en el contenedor de Availability. | U-11 | **Parcial:** convención acordada; falta agregar `Keycloak__ClientSecret: ${AVAILABILITY_CLIENT_SECRET}` al entorno de `availability-api`. | `Keycloak__ClientSecret: ${AVAILABILITY_CLIENT_SECRET}` |
+| **T4.5** | Fijar `Booking:BaseUrl`. | U-10 | **Parcial:** direcciones acordadas; falta mapear `Booking__BaseUrl` en `availability-api` y tener Booking accesible en la dirección configurada. | Docker: `http://booking:8080/`; local: `http://localhost:5200/` |
+| **T4.6** | `BookingClient.GetOccupiedSeatIdsAsync`: `GET api/events/{eventId}/occupied-seats`, deserializa un array JSON de GUIDs ocupados y devuelve el conjunto; `[]` con `200` significa "nada ocupado". Si Booking falla, lanza `ExternalServiceUnavailableException`. | T4.2 | **Implementada (2026-11-04):** contrato de array de GUIDs | — |
+>>>>>>> Stashed changes
 | **T4.7** | `BookingClient.GetStatusByRequestIdAsync`: `GET api/reservations/by-request/{requestId}`, deserializa `{ status, description }`, devuelve `null` ante `404` (solicitud todavía no disponible en Booking) y lanza `ExternalServiceUnavailableException` ante otros errores o respuestas inválidas. | T4.6, U-07 | **Implementada (2026-11-03)** | — |
 | **T4.8** | Enviar `X-Correlation-ID`: `requestId` en consultas de reserva y el ID HTTP en las consultas sin `requestId`. | T4.7, U-08 | **Implementada (2026-11-03):** el cliente fija el `requestId` para la consulta de estado y el handler propaga el ID HTTP para otras consultas | — |
 | **T4.9** | Registrar en `AddInfrastructure` el `KeycloakTokenProvider`, los handlers y el cliente HTTP de Booking. | T4.2, T4.6 | **Implementada (2026-11-03)** | — |
@@ -256,7 +263,7 @@ Pruebas de `Availability.Infrastructure.Tests`:
 | **T6.5** | `GetByUserIdAsync` devuelve solo las solicitudes del usuario en orden de `CreatedAt` descendente y `Id` ascendente | BR-14, BR-42 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
 | **T6.6** | El seed carga al menos un evento con asientos y es reproducible | BR-04 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
 | **T6.7** | El publisher envía el JSON acordado con `MessageId` y `CorrelationId` iguales al `requestId` | BR-17, BR-19 | T6.1, F3 | **Implementada y verificada** |
-| **T6.8** | El cliente devuelve los `seatId` con `isOccupied` en `true`, y vacío si Booking responde `200` con lista vacía (con un `HttpMessageHandler` falso) | BR-25, BR-26 | T6.1, F4 | **Implementada y verificada** |
+| **T6.8** | El cliente deserializa el array de GUIDs ocupados y devuelve vacío si Booking responde `200` con `[]` (con un `HttpMessageHandler` falso) | BR-25, BR-26 | T6.1, F4 | **Implementada y verificada; actualizada al contrato de GUIDs (2026-11-04)** |
 | **T6.9** | `GetStatusByRequestIdAsync` devuelve `null` con `404` y lanza excepción ante un error | BR-27, BR-28 | T6.1, F4 | **Implementada y verificada** |
 | **T6.10** | El token se pide una sola vez mientras es válido y se envía en cada llamada | BR-29, BR-30 | T6.1, F4 | **Implementada y verificada** |
 

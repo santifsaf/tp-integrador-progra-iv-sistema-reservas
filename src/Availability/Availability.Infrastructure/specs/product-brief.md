@@ -210,7 +210,7 @@ Las fallas de Azure Service Bus y Booking se representan mediante `Availability.
 
 **RF-15.** `GetStatusByRequestIdAsync` devuelve `null` ante un `404`. Ante cualquier otro error o caída de Booking, el cliente lanza una excepción clara, distinguiendo "no existe" de "falló".
 
-**RF-16.** `GetOccupiedSeatIdsAsync` deserializa la respuesta de Booking (`[{ "seatId", "isOccupied" }]`) y devuelve un conjunto con los `seatId` cuyo `isOccupied` es `true`. Una lista vacía (`200`) significa que no hay nada ocupado.
+**RF-16.** `GetOccupiedSeatIdsAsync` deserializa la respuesta de Booking como un array JSON de GUIDs ocupados (`["<seatId>"]`) y devuelve ese conjunto. Un array vacío (`200`) significa que no hay nada ocupado.
 
 **RF-17.** Cada llamada a Booking envía `X-Correlation-ID`: usa `requestId` en el flujo de reserva y el ID recibido o generado por el middleware HTTP en consultas sin `requestId`.
 
@@ -265,8 +265,8 @@ Confirmado:
 Endpoint de ocupación, **cerrado**:
 
 - `GET /api/events/{eventId}/occupied-seats` devuelve **solo los asientos ocupados**.
-- Respuesta: `[{ "seatId": "...", "isOccupied": true }]`.
-- Si el evento no tiene reservas, responde `200` con lista vacía.
+- Respuesta: un array JSON de GUIDs, por ejemplo `["c5e8f2a1-6b7d-4c3e-9f10-8a2b4d6e7c90"]`.
+- Si el evento no tiene reservas, responde `200` con `[]`.
 
 Pendiente de confirmar: forma del JSON de la consulta de estado, códigos de error y qué devuelve cuando Booking todavía no procesó la solicitud (ver sección 11).
 
@@ -285,7 +285,7 @@ Pendiente de confirmar: forma del JSON de la consulta de estado, códigos de err
 | Booking y el catálogo | Booking no tiene tabla de eventos ni de asientos; confía en que Availability verificó la existencia |
 | Combinación de catálogo y ocupación | Caso de uso en Application |
 | Estados de la solicitud | `RequestStatus`: `Received`, `Published` y `PublishFailed`, guardado como texto |
-| Endpoint de ocupación de Booking | `GET /api/events/{eventId}/occupied-seats`: solo asientos ocupados, `[{ "seatId", "isOccupied" }]`; lista vacía con `200` si no hay reservas |
+| Endpoint de ocupación de Booking | `GET /api/events/{eventId}/occupied-seats`: array JSON con los GUIDs de los asientos ocupados; `[]` con `200` si no hay reservas |
 
 ## 10. Consistencia eventual
 
@@ -325,7 +325,7 @@ Existe un intervalo entre el `202 Accepted` de Availability y el procesamiento d
 - [ ] `GetByUserIdAsync` devuelve solo las solicitudes del usuario indicado.
 - [ ] El publisher envía al topic el JSON acordado, con `MessageId` y `CorrelationId` iguales al `requestId`, verificable con un consumidor de prueba sobre la suscripción `booking`.
 - [ ] El cliente de Booking obtiene un token, lo cachea y lo envía en cada llamada.
-- [ ] `GetOccupiedSeatIdsAsync` devuelve los `seatId` con `isOccupied` en `true` y un conjunto vacío cuando Booking responde `200` con lista vacía.
+- [ ] `GetOccupiedSeatIdsAsync` deserializa el array de GUIDs ocupados y devuelve un conjunto vacío cuando Booking responde `200` con `[]`.
 - [ ] `GetStatusByRequestIdAsync` devuelve `null` ante `404`; ante un error de Booking lanza `ExternalServiceUnavailableException`.
 - [ ] Hay logs estructurados con Serilog y los campos `Service`, `Operation`, `Event` (`Started`, `Completed`, `Failed`) y `CorrelationId`; incluyen duración, status HTTP y excepción cuando corresponda, sin registrar secretos ni payloads sensibles.
 - [ ] No hay secretos en el repositorio; existe un `.env.example`.
