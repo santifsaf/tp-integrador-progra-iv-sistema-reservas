@@ -1,12 +1,13 @@
 # Historial de prompts e interacciones con IA — Agustín Vasino
 
-**Trabajo práctico:** Programación IV — Sistema distribuido de reserva de asientos (UTN)  
-**Componente:** Payment gRPC — capa de presentación e integración con Business  
-**Herramienta:** ChatGPT  
-**Rama de trabajo:** `feat/payment-agus`  
-**Pull requests:** [#4 — Contrato gRPC](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/4) y [#27 — Servidor gRPC (borrador)](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/27)  
-**Período documentado:** 30/10/2026–04/11/2026  
-**Estado del documento:** Actualizado al 04/11/2026; resta completar la integración definitiva con Booking y el cierre del PR #27.
+**Trabajo práctico:** Programación IV — Sistema distribuido de reserva de asientos (UTN)
+**Componente:** Payment gRPC — capa de presentación e integración con Business
+**Herramienta:** ChatGPT
+**Rama de desarrollo:** `feat/payment-agus` (fusionada en `feat/payment`)
+**Rama para esta actualización documental:** `docs/payment-cierre`
+**Pull requests:** [#4 — Contrato gRPC](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/4) y [#27 — Servidor gRPC (aprobado y fusionado)](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/27)
+**Período documentado:** 30/10/2026–05/11/2026
+**Estado del documento:** Actualizado al 05/11/2026. Desarrollo individual de Payment.Grpc completado e integrado a feat/payment mediante el PR #27, aprobado y fusionado.
 
 ## Alcance y criterio de selección
 
@@ -199,7 +200,7 @@ Este archivo reúne **solicitudes técnicas e intercambios relevantes** de la as
 - **Tipo:** síntesis de interacción técnica; no cita literal.
 - **Solicitud trabajada:** preparar una base de datos PostgreSQL de Payment sin alterar el Docker Compose compartido ni la base de datos de Booking.
 - **Resultado:** contenedor local de PostgreSQL 17 con puerto host `5434`; conexión de Payment por variable de entorno; ejecución de una aplicación temporal externa al repositorio para crear el esquema a partir de `PaymentDbContext` con `EnsureCreatedAsync`. Se verificó la existencia de la tabla `public.payments`.
-- **Limitación reconocida:** esta preparación **no genera migraciones de EF Core** ni es una configuración definitiva del grupo. Antes de entregar hay que acordar y aplicar migraciones oficiales. No se registran credenciales privadas ni tokens en el historial.
+- **Limitación reconocida en esa etapa:** esta preparación **no generaba migraciones de EF Core** ni era una configuración definitiva del grupo. Posteriormente se aplicó la migración oficial `InitialCreate` en otra base de pruebas (ver entrada 29). No se registran credenciales privadas ni tokens en el historial.
 
 ### 22. Diagnóstico de HTTP/2 y prueba de disponibilidad del host
 
@@ -248,29 +249,83 @@ Este archivo reúne **solicitudes técnicas e intercambios relevantes** de la as
 - **Procedimiento:** `git status`, `git diff --check`, selección explícita de cuatro archivos propios y commit local.
 - **Resultado:** commit `9d2efa2` — `feat(payment): integrar dependencias y validacion de negocio en gRPC`, sobre la rama temporal `feat/payment-integracion-agus`.
 - **Archivos incluidos:** `Payment.Grpc.csproj`, `Program.cs`, `PaymentGrpcService.cs` y `PaymentGrpcServiceValidationTests.cs`.
-- **Estado de publicación:** el commit no se había enviado a GitHub al cierre de esta actualización; el PR #27 seguía como borrador. El archivo de prompts tampoco se había agregado al repositorio.
+- **Estado de publicación en ese momento (04/11):** el commit aún no se había enviado a GitHub, el PR #27 seguía como borrador y el historial no estaba publicado. Esto cambió posteriormente (ver entradas 27–33).
 
 ---
 
-## Resultados verificados a la fecha
+## Etapa 6 — Correcciones, pruebas integradas y cierre de PR (05/11/2026)
 
-- Contrato compartido `payment.proto` integrado mediante el PR #4.
-- Servidor gRPC con validaciones y RPC `Charge`/`GetPayment` delegados a `IPaymentService`.
-- Mapper de solicitudes y respuestas entre protobuf y Business.
-- Traducción de errores de negocio a `ALREADY_EXISTS` y `INVALID_ARGUMENT`, y operaciones inexistentes a `NOT_FOUND`.
-- **71 pruebas automatizadas correctas** en la última ejecución local comunicada del proyecto Payment; incluyen pruebas de diversos integrantes y utilizan Testcontainers para las de repositorio.
-- Host de Payment compilado e iniciado con la implementación concreta de Business y Data integrada en la rama temporal.
-- Cobros simulados `SUCCEEDED`, `REJECTED` y `UNAVAILABLE` comprobados mediante cliente gRPC autenticado, con Keycloak y PostgreSQL locales.
-- `GetPayment`, idempotencia secuencial, conflicto por datos distintos y consulta inexistente comprobados.
-- Commit individual publicado previamente: `abcea70` en `feat/payment-agus`; **commit local pendiente de publicación**: `9d2efa2` en `feat/payment-integracion-agus`.
-- [PR #27](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/27) abierto como borrador al cierre de esta actualización.
+### 27. Corrección de la normalización de GUID indicada en la revisión
 
-## Pendientes de integración y documentación
+- **Fecha:** 05/11/2026.
+- **Tipo:** síntesis de la revisión técnica y de los cambios efectuados; no cita literal de un único prompt.
+- **Solicitud trabajada:** responder al señalamiento de Santi de que `ReservationId` y `PaymentOperationId`, aunque válidos como GUID, conservaban variaciones de mayúsculas/minúsculas que podían afectar la idempotencia o la consulta.
+- **Resultado:** normalización a `Guid.ToString("D")` al recibir las solicitudes de `Charge` y `GetPayment`, con tests para representaciones equivalentes.
+- **Evidencia:** commit `a64a587` en `feat/payment-agus`, posteriormente incluido en el PR #27.
 
-1. Verificar la corrección del caso concurrente en el [PR #28 de Juan](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/28) y aprobar únicamente después de la revisión correspondiente.
-2. Incorporar a nuestra rama de publicación la versión aprobada de Business/Data y nuestro commit de integración sin arrastrar cambios ajenos innecesarios.
-3. Preparar y aplicar las **migraciones oficiales de EF Core** y la configuración de infraestructura de Payment para el entorno compartido; `EnsureCreatedAsync` se usó solo en la base local de prueba.
-4. Probar el recorrido real **Booking → Payment gRPC → Business → PostgreSQL**, así como el flujo de fallo solicitado por la consigna cuando un componente no esté disponible.
-5. Actualizar el PR #27 y completar el historial con cualquier prompt o corrección técnica adicional antes de entregar.
+### 28. Actualización de rama y ejecución de la suite completa de Payment
 
-**Nota metodológica:** las entradas de tipo *síntesis* no son citas textuales de los prompts; distinguen claramente el pedido técnico, el trabajo efectuado y la evidencia disponible. Si se exige una exportación literal completa, será necesario adjuntar por separado las conversaciones originales. No se incluyen secretos ni tokens.
+- **Fecha:** 05/11/2026.
+- **Tipo:** síntesis de validación local.
+- **Solicitud trabajada:** integrar los últimos cambios ya incorporados en `feat/payment`, verificar las migraciones disponibles y ejecutar las pruebas de Payment en el estado final de la rama individual.
+- **Resultado observado:** **77 pruebas aprobadas, sin fallos ni pruebas omitidas**, incluidas pruebas de integración con PostgreSQL mediante Testcontainers. El resultado corresponde a una ejecución local; no se atribuye a un pipeline de GitHub Actions.
+- **Evidencia:** salida de `dotnet test src/Payment/Payment.Tests/Payment.Tests.csproj` compartida durante la sesión; commit de merge de rama `7f7eae6`.
+
+### 29. Migración oficial de EF Core y pruebas directas sobre base migrada
+
+- **Fecha:** 05/11/2026.
+- **Tipo:** síntesis de un procedimiento reproducible con resultados observados.
+- **Solicitud trabajada:** comprobar la migración `20261104232835_InitialCreate` de Juan en una base nueva, evitando confundir `EnsureCreatedAsync()` con una migración real.
+- **Resultado:** creación de `payment_migrations_test`, ejecución de `dotnet ef database update --project src/Payment/Payment.Data`, y verificación en PostgreSQL de las tablas `payments` y `__EFMigrationsHistory` y del índice único de `OperationId`.
+- **Verificación adicional:** cliente gRPC temporal autenticado mediante Keycloak: pago `PaymentSucceeded` (`1000` centavos), resultado `PaymentUnavailable` (`1033` centavos), `GetPayment`, reintento idempotente, conflicto `AlreadyExists` y consulta inexistente `NotFound`.
+- **Alcance:** se probaron esos resultados sobre una base migrada y un servidor Payment real. La indisponibilidad simulada **no equivale** a apagar el servidor gRPC.
+
+### 30. Prueba real de integración Booking → Payment → PostgreSQL
+
+- **Fecha:** 05/11/2026.
+- **Tipo:** síntesis de una prueba funcional local con herramientas y servicios reales.
+- **Solicitud trabajada:** ejecutar Booking en una copia de trabajo separada (`git worktree`) y verificar una solicitud recibida desde Azure Service Bus contra `Payment.Grpc`, Keycloak y PostgreSQL, sin mezclar código de Booking con nuestra rama.
+- **Ejecución:** se utilizó PostgreSQL para Booking en un puerto host alternativo `5435` por una colisión local en `5432`; Booking escuchó en `http://localhost:5200` y Payment en `http://localhost:5300`.
+- **Resultado observado:** Booking recibió una solicitud de la suscripción `grupo5-booking-topic/booking`, obtuvo un token Keycloak, ejecutó `Charge` con `Outcome=Succeeded`, pasó la reserva a `Confirmed` y se verificó en la base de Payment el `OperationId` `5c66adb8-33da-4bc3-8fbd-3dff1f51b835` con estado `SUCCEEDED`.
+- **Limitación:** la suscripción era compartida y no se comprobó quién publicó ese mensaje; no acredita por sí sola el recorrido completo desde Availability. Los eventos de Booking fueron registrados en log mediante `LoggingReservationEventPublisher`, no entregados a Notifications.
+- **Precaución:** no se copiaron claves de Azure Service Bus ni secretos de Keycloak al código, los documentos o los commits.
+
+### 31. Incorporación de diagrama de arquitectura e historial al PR
+
+- **Fecha:** 05/11/2026.
+- **Tipo:** síntesis de documentación y control de versiones.
+- **Solicitud trabajada:** elaborar el diagrama de software de Payment exigido por el punto 3.i de la consigna, explicar las tres capas y registrar el historial individual de prompts.
+- **Resultado:** `docs/Payment_Arquitectura.md` y `prompts/Agustin_Vasino.md` agregados mediante el commit `ac1b1b2`, con publicación en `feat/payment-agus` y visibilidad en el PR #27.
+- **Nota:** la primera versión del historial reflejaba el estado anterior a la prueba completa de Booking y al merge. Esta actualización corrige esa información sin presentar resultados pendientes como comprobados.
+
+### 32. Revisión de los pendientes del equipo y de documentación de infraestructura
+
+- **Fecha:** 05/11/2026.
+- **Tipo:** síntesis de revisión técnica y colaboración mediante GitHub.
+- **Solicitud trabajada:** contrastar la consigna con el estado de las ramas y revisar las novedades en los PR de infraestructura y Payment sin cambiar archivos ajenos.
+- **Resultado:** se detectó una diferencia de nombre en la descripción del PR #32 (`PAYMENT_DB_CONNECTION` frente a `PAYMENT_DB_CONNECTION_STRING` para las migraciones). Se dejó una observación no bloqueante y Juan confirmó que era un error de documentación; también había incorporado información de Payment al README de infraestructura. El PR #33 de Juan sobre el README de Payment.Data fue integrado a `feat/payment`.
+- **Alcance:** revisión colaborativa; el código de infraestructura pertenece al subgrupo que lo desarrolló.
+
+### 33. Aprobación y merge del PR individual de Payment
+
+- **Fecha:** 05/11/2026.
+- **Tipo:** síntesis de revisión y control de versiones basada en la interfaz de GitHub y la verificación local de Git.
+- **Solicitud trabajada:** verificar que los cambios posteriores a la apertura del PR #27 estuvieran subidos y que no quedaran modificaciones locales pendientes antes de integrarlo.
+- **Resultado:** `git status -sb` confirmó la rama `feat/payment-agus` sin cambios locales; Santi aprobó el PR; se quitó el estado Draft y se fusionó a `feat/payment`.
+- **Evidencia:** [PR #27 aprobado y fusionado](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/27), commit de merge `a2daa2b`.
+- **Continuación:** se creó `docs/payment-cierre` a partir de `origin/feat/payment` para realizar esta actualización de documentación en un PR separado, sin tocar el código de Payment aprobado.
+
+---
+
+## Resultados verificados al 05/11/2026
+
+- Contrato compartido `contracts/proto/payment.proto` integrado mediante el PR #4.
+- Implementación de `Payment.Grpc` con `Charge` y `GetPayment`, validaciones, mapeos y traducción de excepciones a estados gRPC, delegando la lógica a `IPaymentService`.
+- Normalización de identificadores GUID de entrada al formato `D`, con pruebas de regresión.
+- Integración de `Payment.Grpc` con implementaciones reales de `Payment.Business` y `Payment.Data`.
+- **77 pruebas automatizadas aprobadas, 0 errores y 0 omitidas**, en la ejecución local informada.
+- Aplicación y verificación de la migración EF Core `20261104232835_InitialCreate` sobre la base independiente `payment_migrations_test`.
+- Pruebas directas con cliente gRPC temporal, Keycloak y PostgreSQL: éxito e indisponibilidad simulada sobre la base migrada; rechazo simulado comprobado en pruebas anteriores; idempotencia, `GetPayment`, `AlreadyExists` y `NotFound`.
+- **Integración real observada desde el consumidor de Azure Service Bus de Booking hasta Payment y PostgreSQL**, con reserva confirmada. No se atribuye la publicación inicial del mensaje a Availability sin evidencia.
+- Diagrama individual de arquitectura e historial de prompts publicados en el commit `ac1b1b2`.
+- **PR #27 aprobado por Santi y fusionado a `feat/payment`**, merge `a2daa2b`.
