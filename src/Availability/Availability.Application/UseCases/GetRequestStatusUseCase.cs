@@ -7,8 +7,6 @@ namespace Availability.Application.UseCases;
 
 public class GetRequestStatusUseCase : IGetReservationStatusUseCase
 {
-    private const string Pending = "PENDING";
-    private const string Failed = "FAILED";
     private const string PublishFailedDescription = "No se pudo publicar la solicitud";
 
     private readonly IReservationRequestRepository _reservationRequestRepository;
@@ -38,7 +36,7 @@ public class GetRequestStatusUseCase : IGetReservationStatusUseCase
         if (request.Status == RequestStatus.PublishFailed)
         {
             return Result<RequestStatusDto>.Success(
-                new RequestStatusDto(request.Id, Failed, PublishFailedDescription, request.CreatedAt, request.UpdatedAt));
+                new RequestStatusDto(request.Id, RequestStatusNames.Failed, PublishFailedDescription, request.CreatedAt, request.UpdatedAt));
         }
 
         BookingReservationStatusDto? bookingStatus;
@@ -53,7 +51,7 @@ public class GetRequestStatusUseCase : IGetReservationStatusUseCase
 
         if (bookingStatus is null)
         {
-            return Result<RequestStatusDto>.Success(new RequestStatusDto(request.Id, Pending, null, request.CreatedAt, request.UpdatedAt));
+            return Result<RequestStatusDto>.Success(new RequestStatusDto(request.Id, RequestStatusNames.Pending, null, request.CreatedAt, request.UpdatedAt));
         }
 
         return Result<RequestStatusDto>.Success(
