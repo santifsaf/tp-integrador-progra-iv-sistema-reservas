@@ -12,7 +12,7 @@ public static class DependencyInjection
         services.AddScoped<IGetSeatMapUseCase, GetSeatMapUseCase>();
         services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
         services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
-        services.AddScoped<GetUserRequestsUseCase>();
+        services.AddScoped<IGetUserRequestsUseCase, GetUserRequestsUseCase>();
 
         return services;
     }

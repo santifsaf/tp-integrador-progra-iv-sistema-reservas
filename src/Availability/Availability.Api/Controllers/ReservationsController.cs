@@ -1,5 +1,6 @@
 using Availability.Application.Abstractions;
 using Availability.Application.Common;
+using Availability.Application.Dtos;
 using Availability.Api.DTOs.Requests;
 using Availability.Api.DTOs.Responses;
 using Availability.Api.Extensions;
@@ -20,16 +21,141 @@ public class ReservationsController : ControllerBase
 {
     private readonly ICreateReservationRequestUseCase _createReservationRequestUseCase;
     private readonly IGetReservationStatusUseCase _getReservationStatusUseCase;
+    private readonly IGetUserRequestsUseCase _getUserRequestsUseCase;
     private readonly ILogger<ReservationsController> _logger;
 
     public ReservationsController(
         ICreateReservationRequestUseCase createReservationRequestUseCase,
         IGetReservationStatusUseCase getReservationStatusUseCase,
+        IGetUserRequestsUseCase getUserRequestsUseCase,
         ILogger<ReservationsController> logger)
     {
         _createReservationRequestUseCase = createReservationRequestUseCase;
         _getReservationStatusUseCase = getReservationStatusUseCase;
+        _getUserRequestsUseCase = getUserRequestsUseCase;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Obtiene todas las solicitudes de reserva realizadas por el usuario autenticado.
+    /// Las solicitudes se devuelven ordenadas por fecha de creación descendente (más recientes primero).
+    /// Útil para mostrar el historial de reservas en el frontend.
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelación</param>
+    /// <returns>
+    /// 200 OK: Lista de solicitudes de reserva del usuario (puede estar vacía)
+    /// 401 Unauthorized: Token JWT ausente o inválido
+    /// </returns>
+    /// <remarks>
+    /// Autenticación: Requerida (JWT Bearer token)
+    /// 
+    /// Ejemplo de request:
+    /// ```
+    /// GET /api/reservations
+    /// Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cC...
+    /// ```
+    /// 
+    /// Ejemplo de respuesta (200 OK):
+    /// ```json
+    /// [
+    ///   {
+    ///     "requestId": "a4f1b8e0-8902-4b21-9a2f-1c3d5e7f9b0a",
+    ///     "eventId": "b5f2c9e1-9013-5c32-0b3f-2d4e6f8a0c1b",
+    ///     "seatId": "c6f3d0e2-0124-6d43-1c4f-3e5f7f9b1d2c",
+    ///     "status": "RECEIVED",
+    ///     "createdAt": "2026-11-05T02:15:00Z"
+    ///   }
+    /// ]
+    /// ```
+    /// </remarks>
+    [HttpGet]
+    [ProducesResponseType(typeof(List<UserRequestSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<UserRequestSummaryDto>>> GetMyRequests(
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "unknown";
+
+        // Extraer userId del JWT
+        var userIdString = User.GetUserId();
+        if (!Guid.TryParse(userIdString, out var userId))
+        {
+            _logger.LogWarning(
+                "Token con userId inválido | UserIdString={UserIdString} | CorrelationId={CorrelationId}",
+                userIdString,
+                correlationId);
+
+            var errorResponse = new ErrorResponse(
+                "INVALID_USER_ID",
+                "El token contiene un userId inválido",
+                correlationId);
+
+            return Unauthorized(errorResponse);
+        }
+
+        _logger.LogInformation(
+            "Obteniendo solicitudes de reserva del usuario | UserId={UserId} | CorrelationId={CorrelationId}",
+            userId,
+            correlationId);
+
+        try
+        {
+            var result = await _getUserRequestsUseCase.ExecuteAsync(userId, cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Fallo al obtener solicitudes | Error={Error} | UserId={UserId} | CorrelationId={CorrelationId}",
+                    result.Error,
+                    userId,
+                    correlationId);
+
+                var internalErrorResponse = new ErrorResponse(
+                    "INTERNAL_ERROR",
+                    "Error al procesar la solicitud",
+                    correlationId);
+                return StatusCode(StatusCodes.Status500InternalServerError, internalErrorResponse);
+            }
+
+            var requests = result.Value;
+
+            _logger.LogInformation(
+                "Solicitudes obtenidas exitosamente | UserId={UserId} | Count={Count} | CorrelationId={CorrelationId}",
+                userId,
+                requests.Count,
+                correlationId);
+
+            return Ok(requests);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning(
+                "Solicitud cancelada | UserId={UserId} | CorrelationId={CorrelationId}",
+                userId,
+                correlationId);
+
+            var errorResponse = new ErrorResponse(
+                "REQUEST_TIMEOUT",
+                "La solicitud expiró",
+                correlationId);
+
+            return StatusCode(StatusCodes.Status408RequestTimeout, errorResponse);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error no controlado al obtener solicitudes | UserId={UserId} | CorrelationId={CorrelationId}",
+                userId,
+                correlationId);
+
+            var errorResponse = new ErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "Error interno del servidor",
+                correlationId);
+
+            return StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
+        }
     }
 
     /// <summary>
