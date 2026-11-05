@@ -17,7 +17,7 @@ $env:PAYMENT_DB_CONNECTION_STRING = "Host=localhost;Port=5434;Database=payment;U
 Bash:
 
 ```bash
-export PAYMENT_DB_CONNECTION_STRING ="Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment"
+export PAYMENT_DB_CONNECTION_STRING="Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment"
 ```
 
 Los valores del ejemplo corresponden al servicio `payment-db` del `docker-compose`.
