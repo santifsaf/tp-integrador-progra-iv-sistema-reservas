@@ -57,10 +57,14 @@ Sin `Broker:ConnectionString` la API no arranca, salvo en el entorno `Testing`.
 Para correr `Booking.Api` localmente:
 
 ```powershell
-dotnet user-secrets set "ConnectionStrings:Booking" "<connection string de Postgres>" --project src/Booking/Booking.Api
+dotnet user-secrets set "ConnectionStrings:Booking" "Host=localhost;Port=5432;Database=booking;Username=booking;Password=booking" --project src/Booking/Booking.Api
+# Opcional: aplicar las migraciones al arrancar. Si no, correr antes:
+#   dotnet ef database update --project src/Booking/Booking.Data
+dotnet user-secrets set "Database:MigrateOnStartup" "true" --project src/Booking/Booking.Api
 dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>" --project src/Booking/Booking.Api
 dotnet user-secrets set "Payment:ClientSecret" "booking-secret" --project src/Booking/Booking.Api
 ```
+
 
 ## Configuración
 

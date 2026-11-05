@@ -55,6 +55,13 @@ builder.Services.AddScoped(sp => new OccupiedSeatsQueryService(
     sp.GetRequiredService<ILogger<OccupiedSeatsQueryService>>()));
 
 var app = builder.Build();
+// Migración inicial apagada por defecto; se activa con Database__MigrateOnStartup=true (por ejemplo, en el compose).
+// Va antes de app.Run(): el consumidor del broker y el job de vencimiento arrancan dentro de
+// Run(), así que la tabla ya existe cuando llega el primer mensaje.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await app.Services.MigrateBookingDatabaseAsync();
+}
 app.UseExceptionHandler();
 app.UseStatusCodePages(async context =>
     await Results.Problem(statusCode: context.HttpContext.Response.StatusCode)
