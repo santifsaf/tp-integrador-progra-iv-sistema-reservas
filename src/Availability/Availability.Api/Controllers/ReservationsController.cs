@@ -404,7 +404,8 @@ public class ReservationsController : ControllerBase
     /// ```json
     /// {
     ///   "requestId": "a4f1b8e0-8902-4b21-9a2f-1c3d5e7f9b0a",
-    ///   "status": "CONFIRMED",
+    ///   "status": "REJECTED",
+    ///   "description": "El asiento está ocupado.",
     ///   "createdAt": "2026-10-29T10:30:00Z",
     ///   "updatedAt": "2026-10-29T10:35:00Z"
     /// }
@@ -525,6 +526,7 @@ public class ReservationsController : ControllerBase
             {
                 RequestId = statusFromUseCase.RequestId.ToString("D"),
                 Status = statusFromUseCase.Status,
+                Description = statusFromUseCase.Description,
                 CreatedAt = statusFromUseCase.CreatedAt,
                 UpdatedAt = statusFromUseCase.UpdatedAt > DateTime.MinValue 
                     ? statusFromUseCase.UpdatedAt 
