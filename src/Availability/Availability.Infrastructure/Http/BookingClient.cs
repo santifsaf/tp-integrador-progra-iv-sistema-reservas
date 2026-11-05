@@ -20,7 +20,7 @@ internal sealed class BookingClient(
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient("Booking");
 
     public Task<IReadOnlySet<Guid>> GetOccupiedSeatIdsAsync(Guid eventId, CancellationToken ct) =>
-        ExecuteAsync(
+        ExecuteAsync<IReadOnlySet<Guid>>(
             "GetOccupiedSeatIds",
             GetHttpCorrelationId(),
             async setStatusCode =>
@@ -32,24 +32,12 @@ internal sealed class BookingClient(
                 setStatusCode((int)response.StatusCode);
                 EnsureSuccessStatusCode(response, "occupied seats");
 
-                var items = await ReadResponseAsync<List<OccupiedSeatResponse?>>(
+                var seatIds = await ReadResponseAsync<List<Guid>>(
                     response,
                     "occupied seats",
                     ct);
 
-                if (items.Any(item => item is null))
-                {
-                    throw new ExternalServiceUnavailableException(
-                        "Booking returned an invalid response for occupied seats.",
-                        new JsonException("The response contains a null seat."));
-                }
-
-                IReadOnlySet<Guid> seatIds = items
-                    .OfType<OccupiedSeatResponse>()
-                    .Where(item => item.IsOccupied)
-                    .Select(item => item.SeatId)
-                    .ToHashSet();
-                return seatIds;
+                return seatIds.ToHashSet();
             });
 
     public Task<BookingReservationStatusDto?> GetStatusByRequestIdAsync(
@@ -204,6 +192,4 @@ internal sealed class BookingClient(
                 ex);
         }
     }
-
-    private sealed record OccupiedSeatResponse(Guid SeatId, bool IsOccupied);
 }

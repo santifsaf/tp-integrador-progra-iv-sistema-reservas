@@ -57,9 +57,9 @@
 |---|---|---|
 | **BR-22** | Booking es la única fuente de verdad de la ocupación. Availability no decide si un asiento está ocupado ni confirma reservas. | §1, §9 |
 | **BR-23** | Un asiento está **ocupado** si tiene una reserva `HELD` o `CONFIRMED` en Booking. Con `REJECTED` o `EXPIRED` queda libre. | §8.2 |
-| **BR-24** | `GET /api/events/{eventId}/occupied-seats` devuelve **solo** los asientos ocupados, con la forma `[{ "seatId", "isOccupied" }]`. | §8.2 |
+| **BR-24** | `GET /api/events/{eventId}/occupied-seats` devuelve un array JSON de GUIDs que identifica **solo** los asientos ocupados, por ejemplo `["<seatId>"]`. | §8.2 |
 | **BR-25** | Si el evento no tiene reservas, Booking responde `200` con lista vacía, y eso significa "ningún asiento ocupado". | §8.2, §7.3 RF-16 |
-| **BR-26** | `GetOccupiedSeatIdsAsync` devuelve el conjunto de `seatId` cuyo `isOccupied` es `true`. | §7.3 RF-16 |
+| **BR-26** | `GetOccupiedSeatIdsAsync` deserializa el array JSON de GUIDs devuelto por Booking y devuelve ese conjunto de identificadores ocupados. | §7.3 RF-16 |
 | **BR-27** | `GetStatusByRequestIdAsync` devuelve `null` cuando Booking responde `404`, que significa que todavía no existe una reserva procesada para la solicitud; Availability lo presenta como pendiente si la solicitud existe localmente. | §7.3 RF-15, contrato de Booking verificado (2026-11-03) |
 | **BR-28** | Ante cualquier error distinto de `404`, o ante una caída de Booking, el cliente lanza `Availability.Application.Common.ExternalServiceUnavailableException`. El `404` de la consulta de estado se interpreta como ausencia de la reserva y devuelve `null`. | §7.3 RF-15 |
 | **BR-45** | `GetStatusByRequestIdAsync` deserializa la respuesta `200` de Booking con las propiedades `status` y `description`, correspondientes a `BookingReservationStatusDto(Status, Description)`; `description` puede ser `null`. | Contrato de Booking verificado (2026-11-03) |
