@@ -62,7 +62,7 @@ public class ReservationsController : ControllerBase
     ///     "requestId": "a4f1b8e0-8902-4b21-9a2f-1c3d5e7f9b0a",
     ///     "eventId": "b5f2c9e1-9013-5c32-0b3f-2d4e6f8a0c1b",
     ///     "seatId": "c6f3d0e2-0124-6d43-1c4f-3e5f7f9b1d2c",
-    ///     "status": "RECEIVED",
+    ///     "status": "PENDING",
     ///     "createdAt": "2026-11-05T02:15:00Z"
     ///   }
     /// ]
@@ -192,7 +192,7 @@ public class ReservationsController : ControllerBase
     /// ```json
     /// {
     ///   "requestId": "a4f1b8e0-8902-4b21-9a2f-1c3d5e7f9b0a",
-    ///   "status": "PUBLISHED",
+    ///   "status": "PENDING",
     ///   "message": "Solicitud de reserva aceptada. Use el requestId para seguimiento."
     /// }
     /// ```
