@@ -10,6 +10,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IGetEventsUseCase, GetEventsUseCase>();
         services.AddScoped<IGetSeatMapUseCase, GetSeatMapUseCase>();
+        services.AddScoped<IGetAvailableSeatsUseCase, GetAvailableSeatsUseCase>();
         services.AddScoped<ICreateReservationRequestUseCase, CreateReservationRequestUseCase>();
         services.AddScoped<IGetReservationStatusUseCase, GetRequestStatusUseCase>();
         services.AddScoped<GetUserRequestsUseCase>();
