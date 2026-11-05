@@ -80,7 +80,7 @@ La connection string va por variable de entorno o user-secrets, nunca en el repo
 
 ```bash
 dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>" --project src/Booking/Booking.Api
-# o en docker-compose:  Broker__ConnectionString: ${BOOKING_SERVICEBUS_CONNECTION}
+# o en Docker: BOOKING_BROKER_CONNECTION_STRING=... en infra/.env (archivo que no se commitea)
 ```
 
 ## Estado de la integración
@@ -94,7 +94,7 @@ dotnet user-secrets set "Broker:ConnectionString" "<connection string del profe>
 | Publisher de Availability | ⏳ Rebeca: completar `AmountCents` y `Currency` con el precio del evento. |
 | Servidor de Payment | ⏳ Agus y Juan: simulador de pagos idempotente por `payment_operation_id`. |
 | Notifications | ⏳ Juan y Kevin: hoy los eventos solo se loguean (`IReservationEventPublisher`). |
-| Docker | ⏳ Dockerfile de Booking y bloque en el compose con 2 réplicas. |
+| Docker | ✅ `src/Booking/Booking.Api/Dockerfile` y servicio `booking-api` en `infra/docker-compose.yml` con 2 réplicas. |
 
 ## Decisiones (resumen para la defensa)
 
