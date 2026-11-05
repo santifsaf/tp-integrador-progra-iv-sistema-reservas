@@ -121,4 +121,40 @@ public class ReservationRepositoryRejectedTests
 
         Assert.Equal("reservation", ex.ParamName);
     }
+
+    [Fact]
+    public async Task AddRejectedAsync_Exitoso_NoDejaLaEntidadTrackeada()
+    {
+        await _fixture.ResetAsync();
+        await using var ctx = _fixture.CreateContext();
+        var repository = new ReservationRepository(ctx);
+
+        var added = await repository.AddRejectedAsync(TestData.BuildRejectedReservation(), CancellationToken.None);
+
+        Assert.True(added);
+        Assert.Empty(ctx.ChangeTracker.Entries());
+    }
+
+    [Fact]
+    public async Task AddRejectedAsync_Exitoso_UnaMutacionEnMemoriaNoSePersisteConUnGuardadoPosterior()
+    {
+        await _fixture.ResetAsync();
+        await using var ctx = _fixture.CreateContext();
+        var repository = new ReservationRepository(ctx);
+
+        var first = TestData.BuildRejectedReservation(reason: RejectionReason.SeatOccupied);
+        Assert.True(await repository.AddRejectedAsync(first, CancellationToken.None));
+
+        // La capa de negocio cambia el objeto en memoria...
+        first.RejectionReason = RejectionReason.PaymentFailed;
+
+        // ...y un guardado posterior en el mismo contexto no debe arrastrar ese cambio.
+        Assert.True(await repository.AddRejectedAsync(TestData.BuildRejectedReservation(), CancellationToken.None));
+
+        await using var verifyContext = _fixture.CreateContext();
+        var persisted = await new ReservationRepository(verifyContext)
+            .GetByRequestIdAsync(first.RequestId, CancellationToken.None);
+        Assert.NotNull(persisted);
+        Assert.Equal(RejectionReason.SeatOccupied, persisted.RejectionReason);
+    }
 }

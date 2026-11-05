@@ -51,6 +51,14 @@ public sealed class ReservationRepository(BookingDbContext context) : IReservati
             // Otra violación de unicidad inesperada: propagar.
             throw;
         }
+
+        finally
+        {
+            // El repositorio nunca deja entidades trackeadas: la capa de negocio muta este mismo
+            // objeto después (estado, motivo) y, si siguiera trackeado, un SaveChanges posterior en
+            // el mismo scope persistiría esos cambios salteándose las condiciones de los UPDATE atómicos.
+            context.Entry(reservation).State = EntityState.Detached;
+        }
     }
 
     public async Task<bool> AddRejectedAsync(Reservation reservation, CancellationToken ct)
@@ -83,6 +91,14 @@ public sealed class ReservationRepository(BookingDbContext context) : IReservati
 
             // Otra violación inesperada: propagar.
             throw;
+        }
+
+        finally
+        {
+            // El repositorio nunca deja entidades trackeadas: la capa de negocio muta este mismo
+            // objeto después (estado, motivo) y, si siguiera trackeado, un SaveChanges posterior en
+            // el mismo scope persistiría esos cambios salteándose las condiciones de los UPDATE atómicos.
+            context.Entry(reservation).State = EntityState.Detached;
         }
     }
 
@@ -172,7 +188,7 @@ public sealed class ReservationRepository(BookingDbContext context) : IReservati
         // aceptada: entre que vence y que se procesa, aparecerá como ocupada.
         return await context.Reservations
             .AsNoTracking()
-            .Where(r => r.EventId == eventId && 
+            .Where(r => r.EventId == eventId &&
                         (r.Status == ReservationStatus.Held || r.Status == ReservationStatus.Confirmed))
             .Select(r => r.SeatId)
             .Distinct()

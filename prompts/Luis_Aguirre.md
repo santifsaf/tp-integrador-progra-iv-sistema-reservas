@@ -133,3 +133,56 @@ Restricciones:
 •	Comentarios en español solo para decisiones no obvias.
 Formato de respuesta:
 1.	ReservationRepository.cs completo, 2) ReservationRepositoryOccupiedSeatsTests.cs, 3) una lista breve de supuestos y de casos que el código NO cubre.
+
+
+
+
+# Prompt 6:
+Contexto: Agregué a BookingDataServiceCollectionExtensions el método de extensión MigrateBookingDatabaseAsync(this IServiceProvider services, CancellationToken ct = default): crea un scope, obtiene BookingDbContext con GetService (puede ser null si no se registró AddBookingData) y, si existe, llama a Database.MigrateAsync. Si no existe, no hace nada. Podés leer como contexto BookingDataServiceCollectionExtensions.cs, PostgresFixture.cs, BookingDbContext.cs y ReservationRepositoryOccupiedSeatsTests.cs como referencia de estilo. Tarea: Escribí los tests de integración de ese método en un archivo nuevo, BookingDatabaseMigrationTests.cs, namespace Booking.Data.Tests. Ya está expuesto en PostgresFixture una propiedad pública ConnectionString que devuelve la cadena de conexión que la fixture ya usa (el campo _connectionString). Tests (xUnit, Assert, mismo estilo que el archivo de referencia; clase con [Collection("Postgres")] y [Trait("Category", "Integration")], fixture por constructor):
+1.	Sin AddBookingData: un ServiceCollection vacío, construido con BuildServiceProvider, llama a MigrateBookingDatabaseAsync y termina sin lanzar excepción (representa el entorno Testing, sin connection string).
+2.	Con AddBookingData(_fixture.ConnectionString): construir el proveedor y llamar a MigrateBookingDatabaseAsync DOS veces seguidas sin que falle (idempotencia). Después, con un scope nuevo, comprobar que no hay migraciones pendientes (Database.GetPendingMigrationsAsync vacío) y que las migraciones aplicadas (GetAppliedMigrationsAsync) coinciden con todas las del ensamblado (Database.GetMigrations()). Restricciones: •	La base booking_tests la comparten los demás tests: no borres ni recrees el esquema, no hagas TRUNCATE y no uses EnsureDeleted. Los tests solo leen el estado de las migraciones. •	Liberá el proveedor y los scopes con await using. •	Sin librerías nuevas ni mocking. No toques las migraciones, el DbContext ni los otros archivos de tests. •	Comentarios en español solo para decisiones no obvias. Formato de respuesta: BookingDatabaseMigrationTests.cs y una lista breve de supuestos y de lo que estos tests NO cubren.
+
+
+# Prompt 7:
+Contexto: Sigo con los tests de integración. En ReservationRepositoryResolveTests.cs hay un test de carrera, Carrera_DiezTareasEnParalelo_SoloUnaLograActualizar, que lanza 10 tareas en paralelo contra TryResolveHeldAsync sobre la MISMA reserva Held vigente (la mitad a Confirmed y la mitad a Rejected). Hoy usa un CountdownEvent como portón de salida, que BLOQUEA hilos del thread pool, y su aserción final solo comprueba que el estado sea Confirmed o Rejected, sin verificar cuál ganó. Revisá ese archivo de tests, el repositorio, la fixture, TestData.cs y ReservationRepositoryExpireTests.cs, que ya tiene tests de carrera hechos con TaskCompletionSource; usalo como referencia de estilo.
+Tarea: Reescribí SOLO ese test de carrera.
+Cambios pedidos:
+1.	Portón sin bloqueo: reemplazá el CountdownEvent por un TaskCompletionSource<bool> creado con TaskCreationOptions.RunContinuationsAsynchronously. Cada tarea hace "await gate.Task" antes de llamar al repositorio, y el test lo libera con gate.SetResult(true) después de crear TODAS las tareas. No uses Wait(), Result, Barrier.SignalAndWait ni nada que bloquee hilos.
+2.	Cada tarea usa su PROPIO contexto (_fixture.CreateContext(), con await using) y su propio ReservationRepository. Cada tarea devuelve una tupla con el estado destino que intentó (Confirmed o Rejected, alternando por índice) y si el repositorio devolvió true. Cuidado con la captura del índice: crealas con Enumerable.Range(0, 10).Select(i => ...), no con un for que comparta la variable. El motivo de rechazo debe ser un RejectionReason? declarado explícitamente (null para Confirmed, PaymentUnavailable para Rejected).
+3.	Aserciones: exactamente UNA tarea devuelve true y las otras 9 false. Después, leé la reserva con un contexto nuevo y verificá que el estado final coincide con el destino de la tarea que ganó: si ganó una Confirmed, Status = Confirmed y RejectionReason nulo; si ganó una Rejected, Status = Rejected y RejectionReason = PaymentUnavailable. UpdatedAt tiene que ser igual a la fecha 'now' que usaron las tareas.
+4.	Repetí el escenario 20 veces con reservas DISTINTAS (una nueva por vuelta, sembrada con un contexto aparte), para que la carrera ocurra de verdad cada vez; una sola corrida casi nunca la muestra. No exijas que gane cada destino alguna vez: quién gana depende del scheduler.
+5.	Usá la fecha fija FixedNow que ya tiene la clase, no UtcNow, con reservas vigentes (ExpiresAt posterior a 'now').
+Restricciones:
+•	Devolvé SOLO el método de test reemplazado (y un helper privado si hace falta). No reescribas el archivo entero ni toques los otros tests, la fixture ni TestData.cs. Agregá los using que falten de ser necesario.
+•	Sin librerías nuevas ni mocking. Mantené el nombre del test, o proponé uno mejor en español si el actual ya no describe lo que hace.
+•	Comentarios en español solo para decisiones no obvias (por qué RunContinuationsAsynchronously, por qué contextos separados, por qué repetir el escenario).
+Formato de respuesta:
+1.	el método de test, 2) una lista breve de supuestos y de lo que el test NO cubre.
+
+
+
+# Prompt 8:
+Contexto:
+Cambié ReservationRepository para que TryHoldAsync y AddRejectedAsync suelten la entidad del contexto (EntityState.Detached) en un bloque finally: tanto tras un insert exitoso como tras un conflicto manejado o un error inesperado. El motivo: la capa de negocio (ReservationRequestProcessor) MUTA en memoria el mismo objeto Reservation después de resolver el cobro (Status, RejectionReason, UpdatedAt). Si ese objeto siguiera trackeado, cualquier SaveChangesAsync posterior en el mismo contexto persistiría esas mutaciones saltándose las condiciones de los UPDATE atómicos (status = 'Held' AND expires_at > now). Podés revisar el repositorio, los dos archivos de tests donde van a ir los tests nuevos, la fixture y TestData.cs.
+
+Tarea:
+Escribí SOLO los tests nuevos, listos para pegar dentro de las clases existentes (no reescribas los archivos). Usá los helpers que cada archivo ya tiene o TestData donde corresponda.
+
+En ReservationRepositoryHoldTests:
+1. TryHoldAsync exitoso no deja la entidad trackeada: un solo contexto, llamada con una reserva Held nueva, resultado Created y ChangeTracker.Entries() vacío.
+2. Una mutación en memoria no se persiste con un guardado posterior: con un solo contexto y un solo repositorio, TryHoldAsync de una reserva A (Created); después mutar A.Status = Confirmed en memoria; después TryHoldAsync de otra reserva B sobre OTRO asiento (Created); finalmente, con un contexto nuevo, leer A con GetByRequestIdAsync y verificar que en la base sigue Held.
+3. Un error inesperado tampoco deja la entidad trackeada: construí una reserva con Currency de más de 3 caracteres (la columna es varchar(3)) para provocar una DbUpdateException que NO es una violación de unicidad. Verificá con Assert.ThrowsAsync<DbUpdateException> que se propaga y que después ChangeTracker.Entries() está vacío.
+
+En ReservationRepositoryRejectedTests:
+4. AddRejectedAsync exitoso no deja la entidad trackeada (mismo criterio que el 1).
+5. Mutación posterior no se persiste: con un solo contexto, AddRejectedAsync de una reserva Rejected R1 (motivo SeatOccupied) devuelve true; mutar R1.RejectionReason a PaymentFailed en memoria; AddRejectedAsync de otra reserva Rejected R2 devuelve true; con un contexto nuevo, verificar que R1 conserva el motivo SeatOccupied en la base.
+
+Restricciones:
+- Un contexto por test (await using); el contexto de verificación es siempre otro, nuevo.
+- Cada test empieza con await _fixture.ResetAsync(), igual que los existentes.
+- Los tests 2 y 5 tienen que FALLAR si se elimina el bloque finally del repositorio: explicá en una frase, para cada uno, qué escribiría en la base el SaveChanges posterior sin ese finally.
+- Sin librerías nuevas ni mocking. No modifiques los tests existentes, la fixture, TestData.cs ni el repositorio. Indicá si hace falta algún using nuevo (por ejemplo Microsoft.EntityFrameworkCore).
+- Nombres en español que describan el comportamiento; comentarios en español solo para decisiones no obvias (por qué Currency largo provoca el error, por qué se muta A antes de guardar B).
+
+Formato de respuesta:
+1) los cinco tests, separados por archivo, 2) una lista breve de supuestos y de lo que NO cubren.

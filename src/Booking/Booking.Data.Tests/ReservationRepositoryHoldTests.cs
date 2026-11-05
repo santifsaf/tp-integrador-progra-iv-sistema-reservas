@@ -1,5 +1,6 @@
 using Booking.Data.Entities;
 using Booking.Data.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Booking.Data.Tests;
@@ -156,5 +157,64 @@ public class ReservationRepositoryHoldTests
         Assert.NotNull(persisted);
         Assert.Equal(3_000_000_123, persisted.AmountCents);
         Assert.Equal("USD", persisted.Currency);
+    }
+
+    [Fact]
+    public async Task TryHoldAsync_Exitoso_NoDejaLaEntidadTrackeada()
+    {
+        await _fixture.ResetAsync();
+        await using var ctx = _fixture.CreateContext();
+        var repository = new ReservationRepository(ctx);
+
+        var result = await repository.TryHoldAsync(BuildHeldReservation(), CancellationToken.None);
+
+        Assert.Equal(HoldResult.Created, result);
+        Assert.Empty(ctx.ChangeTracker.Entries());
+    }
+
+    [Fact]
+    public async Task TryHoldAsync_Exitoso_UnaMutacionEnMemoriaNoSePersisteConUnGuardadoPosterior()
+    {
+        await _fixture.ResetAsync();
+        await using var ctx = _fixture.CreateContext();
+        var repository = new ReservationRepository(ctx);
+
+        var first = BuildHeldReservation();
+        Assert.Equal(HoldResult.Created, await repository.TryHoldAsync(first, CancellationToken.None));
+
+        // La capa de negocio actualiza el objeto en memoria después de resolver el cobro...
+        first.Status = ReservationStatus.Confirmed;
+
+        // ...y un guardado posterior en el mismo contexto no debe arrastrar ese cambio.
+        Assert.Equal(HoldResult.Created, await repository.TryHoldAsync(BuildHeldReservation(), CancellationToken.None));
+
+        await using var verifyContext = _fixture.CreateContext();
+        var persisted = await new ReservationRepository(verifyContext)
+            .GetByRequestIdAsync(first.RequestId, CancellationToken.None);
+        Assert.NotNull(persisted);
+        Assert.Equal(ReservationStatus.Held, persisted.Status);
+    }
+
+    [Fact]
+    public async Task TryHoldAsync_ErrorInesperado_SePropagaYNoDejaLaEntidadTrackeada()
+    {
+        await _fixture.ResetAsync();
+        await using var ctx = _fixture.CreateContext();
+        var repository = new ReservationRepository(ctx);
+
+        // Una moneda de más de 3 caracteres no entra en la columna varchar(3): Postgres rechaza el
+        // insert, pero NO es una violación de unicidad, así que el repositorio no la maneja y la propaga.
+        var reservation = TestData.BuildHeldReservation(currency: "ARGENTINA");
+
+        await Assert.ThrowsAsync<DbUpdateException>(
+            () => repository.TryHoldAsync(reservation, CancellationToken.None));
+
+        Assert.Empty(ctx.ChangeTracker.Entries());
+
+        // Y no quedó nada guardado.
+        await using var verifyContext = _fixture.CreateContext();
+        var persisted = await new ReservationRepository(verifyContext)
+            .GetByRequestIdAsync(reservation.RequestId, CancellationToken.None);
+        Assert.Null(persisted);
     }
 }
