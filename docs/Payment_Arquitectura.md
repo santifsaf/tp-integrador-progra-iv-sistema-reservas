@@ -1,11 +1,12 @@
 # Arquitectura de software — Microservicio Payment
 
-**Trabajo práctico integrador:** Programación IV — UTN  
-**Componente:** Payment (API gRPC)  
-**Arquitectura:** N-Layer con dominio anémico  
-**Responsable del componente gRPC:** Agustín Vasino  
-**Estado:** **Arquitectura de Payment implementada y validada; documentación pendiente de incorporación al repositorio**  
-**Referencia:** código de `feat/payment-agus`, pruebas automatizadas y verificaciones locales del 04–05/11/2026.
+**Trabajo práctico integrador:** Programación IV — UTN
+**Componente:** Payment (API gRPC)
+**Arquitectura:** N-Layer con dominio anémico
+**Responsable del componente gRPC:** Agustín Vasino
+**Estado:** **Implementada, validada localmente y fusionada en `feat/payment` mediante el PR #27**
+**Referencia:** [PR #27](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/27), commit de merge `a2daa2b`, pruebas automatizadas y verificaciones locales del 04–05/11/2026.
+**Actualización del documento:** 05/11/2026, posterior a la aprobación y al merge del PR #27.
 
 ## 1. Diagrama de arquitectura
 
@@ -152,12 +153,13 @@ Tras esa prueba, en `payment_migrations_test` había **tres registros**: **dos `
 
 **Limitación detectada:** los logs registraron `ReservationConfirmed` mediante `LoggingReservationEventPublisher`, con el mensaje «sin publicador real configurado». Esto **no demuestra** que Notifications haya recibido un evento o enviado una notificación.
 
-## 6. Pendientes y límites de validación
+### 5.5. Revisión de código, aprobación e integración
 
-- **Probar una caída o indisponibilidad real de Payment desde Booking**, verificando el manejo del resultado incierto, el estado de la reserva y el reintento seguro, coordinando con el equipo antes de desconectar servicios compartidos.
-- **Verificar el recorrido completo desde Availability**, incluido el envío del mensaje a Azure Service Bus y la consulta posterior del estado de reserva; las comprobaciones aquí documentadas empiezan en el consumidor de Booking.
-- **Implementar/verificar la publicación y el consumo reales de eventos de Notifications** para creación y confirmación de reservas. El log de eventos de Booking no sustituye una notificación real.
-- **Incorporar este diagrama y el historial individual de prompts** a GitHub en un commit de documentación y cerrar la revisión del PR #27 con el equipo.
-- **Completar el diagrama general, la tabla de interpretación de componentes y los diagramas de otras APIs** a nivel grupal, señalando la consistencia eventual entre Availability y Booking.
+- El revisor señaló un riesgo al recibir el mismo GUID con distintas combinaciones de mayúsculas/minúsculas. En `Charge` y `GetPayment` se normalizaron los identificadores con `Guid.Parse(...).ToString("D")` y se incorporaron pruebas de regresión (commit `a64a587`).
+- Tras incorporar el código de negocio y las migraciones de Data, las **77 pruebas** de Payment pasaron localmente. La evidencia de ejecución se describe en los apartados anteriores; **no corresponde afirmar que estas pruebas se ejecutaron en un pipeline de CI**.
+- Los archivos `docs/Payment_Arquitectura.md` y `prompts/Agustin_Vasino.md` se incorporaron inicialmente al PR mediante el commit `ac1b1b2`.
+- El **05/11/2026**, Santi aprobó el [PR #27](https://github.com/santifsaf/tp-integrador-progra-iv-sistema-reservas/pull/27); posteriormente se hizo el **merge a `feat/payment`**, registrado como `a2daa2b`. La actualización documental posterior se prepara por separado, sin alterar el código ya aprobado.
 
-**Límites de este documento:** describe la arquitectura **de Payment** y las pruebas observadas; no certifica por sí solo la entrega completa del TP. La **consistencia eventual** y el agregado de **Notifications** deben aparecer también en el **diagrama general del sistema**.
+### 5.6. Diferencia entre el fallo simulado y una caída real
+
+La respuesta de negocio `PaymentUnavailable` obtenida con el simulador **no equivale** a interrumpir la disponibilidad del servidor gRPC. La prueba de caída real desde Booking (por ejemplo, un fallo de comunicación durante `Charge`) **no fue ejecutada como parte de estas verificaciones**. Corresponde al flujo alternativo de fallo de la entrega grupal, que requiere coordinación antes de usar la suscripción compartida del broker.
