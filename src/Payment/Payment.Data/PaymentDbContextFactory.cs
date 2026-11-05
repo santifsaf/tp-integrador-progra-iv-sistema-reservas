@@ -21,7 +21,7 @@ namespace Payment.Data
                     );
 
             var options = new DbContextOptionsBuilder<PaymentDbContext>()
-                .UseNpgsql("Host=localhost;Port=5432;Database=payment;Username=postgres;Password=postgres")
+                .UseNpgsql(connectionString)
                 .Options;
 
             return new PaymentDbContext(options);

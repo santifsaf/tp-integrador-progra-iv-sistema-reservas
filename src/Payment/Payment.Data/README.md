@@ -4,7 +4,7 @@ Capa de datos del servicio Payment: entidades, `PaymentDbContext`, repositorio y
 
 ## Migraciones
 
-La cadena de conexión se lee de la variable de entorno `PAYMENT_DB_CONNECTION`. Si falta, `dotnet ef` falla con un mensaje claro. No hay credenciales escritas en el código.
+La cadena de conexión se lee de la variable de entorno `PAYMENT_DB_CONNECTION_STRING`. Si falta, `dotnet ef` falla con un mensaje claro. No hay credenciales escritas en el código.
 
 ### 1. Definir la cadena de conexión
 
