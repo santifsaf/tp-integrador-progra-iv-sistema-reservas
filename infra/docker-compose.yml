@@ -78,12 +78,14 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://+:8080
-      - JwtSettings__Authority=http://keycloak:8081
-      - JwtSettings__Audience=availability-api
-      - JwtSettings__RequireHttpsMetadata=false
+      - Keycloak__ClientSecret=${AVAILABILITY_CLIENT_SECRET}
+      - ConnectionStrings__AvailabilityDb=Host=availability-db;Port=5432;Database=${AVAILABILITY_DB_NAME:-availability};Username=${AVAILABILITY_DB_USER:-availability};Password=${AVAILABILITY_DB_PASSWORD:-availability}
+      - ServiceBus__ConnectionString=${MSG_BROKER_CONNECTION_STRING}
     ports:
       - "5100:8080"
     depends_on:
+      availability-db:
+        condition: service_healthy
       keycloak:
         condition: service_healthy
     networks:
