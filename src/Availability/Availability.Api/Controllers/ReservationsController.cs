@@ -117,7 +117,7 @@ public class ReservationsController : ControllerBase
                 return StatusCode(StatusCodes.Status500InternalServerError, internalErrorResponse);
             }
 
-            var requests = result.Value;
+            var requests = result.Value!;
 
             _logger.LogInformation(
                 "Solicitudes obtenidas exitosamente | UserId={UserId} | Count={Count} | CorrelationId={CorrelationId}",
