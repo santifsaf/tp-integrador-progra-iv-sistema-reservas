@@ -11,7 +11,7 @@ public class ReservationResponse
     public string RequestId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Estado actual de la solicitud (ej: "Pending", "Confirmed", "Failed").
+    /// Estado de la solicitud. Al crearla siempre es PENDING.
     /// </summary>
     public string Status { get; set; } = string.Empty;
 

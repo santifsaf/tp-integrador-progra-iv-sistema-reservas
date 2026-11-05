@@ -26,7 +26,7 @@ public class GetReservationStatusResponse
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
-    /// Fecha y hora de última actualización (UTC).
+    /// Fecha y hora de última actualización (UTC). Hoy siempre coincide con CreatedAt.
     /// </summary>
     public DateTime UpdatedAt { get; set; }
 }

@@ -221,7 +221,7 @@ namespace Availability.Api.Controllers
 				return Accepted(new ReservationResponse
 				{
 					RequestId = result.RequestId,
-					Status = "RECEIVED",
+					Status = "PENDING",
 					Message = "Solicitud recibida correctamente",
 					CreatedAt = DateTime.UtcNow
 				});

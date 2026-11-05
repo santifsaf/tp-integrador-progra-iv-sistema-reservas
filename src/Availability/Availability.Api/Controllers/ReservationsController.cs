@@ -11,7 +11,7 @@ namespace Availability.Api.Controllers;
 
 /// <summary>
 /// Controlador para gestionar solicitudes de reserva de asientos.
-/// Requier autenticación JWT para todos los endpoints.
+/// Requiere autenticación JWT para todos los endpoints.
 /// </summary>
 [ApiController]
 [Route("api/reservations")]
@@ -42,10 +42,8 @@ public class ReservationsController : ControllerBase
     /// Útil para mostrar el historial de reservas en el frontend.
     /// </summary>
     /// <param name="cancellationToken">Token de cancelación</param>
-    /// <returns>
-    /// 200 OK: Lista de solicitudes de reserva del usuario (puede estar vacía)
-    /// 401 Unauthorized: Token JWT ausente o inválido
-    /// </returns>
+    /// <response code="200">Lista de solicitudes de reserva del usuario, con el estado local (puede estar vacía)</response>
+    /// <response code="401">Token JWT ausente o inválido</response>
     /// <remarks>
     /// Autenticación: Requerida (JWT Bearer token)
     /// 
@@ -70,7 +68,7 @@ public class ReservationsController : ControllerBase
     /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(List<UserRequestSummaryDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(void), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IReadOnlyList<UserRequestSummaryDto>>> GetMyRequests(
         CancellationToken cancellationToken)
     {
@@ -164,18 +162,14 @@ public class ReservationsController : ControllerBase
     /// </summary>
     /// <param name="request">DTO con EventId y SeatId (ambos como guid del servicio público)</param>
     /// <param name="cancellationToken">Token de cancelación</param>
-    /// <returns>
-    /// 202 Accepted: Solicitud aceptada, contiene RequestId para seguimiento posterior
-    /// 400 Bad Request: Validación fallida (EventId o SeatId inválidos)
-    /// 401 Unauthorized: Token JWT ausente o inválido
-    /// 403 Forbidden: Usuario no autenticado o sin permisos
-    /// 404 Not Found: Evento o asiento no existe
-    /// 409 Conflict: Asiento ya está reservado
-    /// 503 Service Unavailable: Servicio de publicación no disponible
-    /// </returns>
+    /// <response code="202">Solicitud aceptada; contiene el requestId para seguimiento. No garantiza que el asiento esté libre: lo decide Booking</response>
+    /// <response code="400">Validación fallida: EventId o SeatId ausentes o inválidos</response>
+    /// <response code="401">Token JWT ausente o inválido</response>
+    /// <response code="404">El evento o el asiento no existen</response>
+    /// <response code="503">No se pudo publicar la solicitud en Azure Service Bus</response>
     /// <remarks>
     /// Autenticación: Requerida (JWT Bearer token)
-    /// 
+    ///
     /// Ejemplo de request:
     /// ```
     /// POST /api/reservations
@@ -183,8 +177,8 @@ public class ReservationsController : ControllerBase
     /// Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cC...
     /// 
     /// {
-    ///   "eventId": "a4f1b8e0-8902-4b21-9a2f-1c3d5e7f9b0a",
-    ///   "seatId": "c3d5e7f9-b0a4-4f1b-8e08-9024b219a2f"
+    ///   "eventId": "11111111-1111-1111-1111-111111111111",
+    ///   "seatId": "11111111-1111-1111-1111-111111111101"
     /// }
     /// ```
     /// 
@@ -199,11 +193,10 @@ public class ReservationsController : ControllerBase
     /// </remarks>
     [HttpPost]
     [ProducesResponseType(typeof(ReservationResponse), StatusCodes.Status202Accepted)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(void), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<ReservationResponse>> CreateReservation(
         [FromBody] CreateReservationRequest request,
         CancellationToken cancellationToken)
@@ -382,14 +375,11 @@ public class ReservationsController : ControllerBase
     /// </summary>
     /// <param name="requestId">Identificador de la solicitud de reserva (GUID)</param>
     /// <param name="cancellationToken">Token de cancelación</param>
-    /// <returns>
-    /// 200 OK: Estado actual de la solicitud
-    /// 400 Bad Request: RequestId inválido (no es un GUID válido)
-    /// 401 Unauthorized: Token JWT ausente o inválido
-    /// 403 Forbidden: El usuario no es propietario de la solicitud
-    /// 404 Not Found: Solicitud de reserva no existe
-    /// 503 Service Unavailable: Servicio de booking no disponible
-    /// </returns>
+    /// <response code="200">Estado actual de la solicitud</response>
+    /// <response code="401">Token JWT ausente o inválido</response>
+    /// <response code="403">El usuario no es propietario de la solicitud</response>
+    /// <response code="404">La solicitud no existe, o el requestId no es un GUID válido</response>
+    /// <response code="503">No se pudo consultar a Booking</response>
     /// <remarks>
     /// Autenticación: Requerida (JWT Bearer token)
     /// Autorización: Solo el propietario de la solicitud puede consultarla.
@@ -407,17 +397,16 @@ public class ReservationsController : ControllerBase
     ///   "status": "REJECTED",
     ///   "description": "El asiento está ocupado.",
     ///   "createdAt": "2026-10-29T10:30:00Z",
-    ///   "updatedAt": "2026-10-29T10:35:00Z"
+    ///   "updatedAt": "2026-10-29T10:30:00Z"
     /// }
     /// ```
     /// </remarks>
     [HttpGet("{requestId:guid}")]
     [ProducesResponseType(typeof(GetReservationStatusResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(typeof(void), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<GetReservationStatusResponse>> GetReservationStatus(
         [FromRoute] Guid requestId,
         CancellationToken cancellationToken)

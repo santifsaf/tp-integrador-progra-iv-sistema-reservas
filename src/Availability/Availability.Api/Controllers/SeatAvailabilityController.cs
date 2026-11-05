@@ -33,9 +33,7 @@ public class SeatAvailabilityController : ControllerBase
     /// Este endpoint es útil para obtener eventos sin depender del servicio de Booking.
     /// </summary>
     /// <param name="cancellationToken">Token de cancelación</param>
-    /// <returns>
-    /// 200 OK: Lista de eventos disponibles ordenados por fecha de inicio
-    /// </returns>
+    /// <response code="200">Lista de eventos ordenados por fecha de inicio</response>
     [HttpGet]
     [ProducesResponseType(typeof(List<EventSummaryDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<EventSummaryDto>>> GetEvents(
@@ -81,15 +79,13 @@ public class SeatAvailabilityController : ControllerBase
     /// </summary>
     /// <param name="eventId">Identificador del evento (Guid)</param>
     /// <param name="cancellationToken">Token de cancelación</param>
-    /// <returns>
-    /// 200 OK: Mapa de asientos con información del evento y estado de cada asiento
-    /// 404 Not Found: Evento no encontrado
-    /// 503 Service Unavailable: Servicio de reservas no disponible
-    /// </returns>
+    /// <response code="200">Mapa de asientos con información del evento y estado de cada asiento</response>
+    /// <response code="404">Evento no encontrado</response>
+    /// <response code="503">No se pudo consultar a Booking</response>
     [HttpGet("{eventId:guid}/seats")]
     [ProducesResponseType(typeof(SeatMapDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<SeatMapDto>> GetSeatsAvailability(
         [FromRoute] Guid eventId,
         CancellationToken cancellationToken)

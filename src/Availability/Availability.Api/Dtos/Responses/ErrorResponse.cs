@@ -8,7 +8,7 @@ public class ErrorResponse
 {
     /// <summary>
     /// Código de error interno de la aplicación (no el código HTTP).
-    /// Ej: "INVALID_EVENT_ID", "SEAT_UNAVAILABLE", "UNAUTHORIZED"
+    /// Ej: "EVENT_NOT_FOUND", "SERVICE_UNAVAILABLE", "FORBIDDEN"
     /// </summary>
     public string Code { get; set; } = string.Empty;
 
