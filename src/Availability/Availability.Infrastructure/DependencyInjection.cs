@@ -20,18 +20,39 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.AddOptions<ServiceBusOptions>()
-            .Bind(configuration.GetSection("ServiceBus"));
+            .Bind(configuration.GetSection("ServiceBus"))
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.ConnectionString) && !string.IsNullOrWhiteSpace(o.TopicName),
+                "Falta ServiceBus:ConnectionString o ServiceBus:TopicName. Local: dotnet user-secrets set \"ServiceBus:ConnectionString\" \"...\" --project src/Availability/Availability.Api. Docker: completar MSG_BROKER_CONNECTION_STRING en infra/.env. Ver infra/README.md.")
+            .ValidateOnStart();
         services.AddOptions<BookingClientOptions>()
-            .Bind(configuration.GetSection("Booking"));
+            .Bind(configuration.GetSection("Booking"))
+            .Validate(
+                o => Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out _),
+                "Falta Booking:BaseUrl o no es una URL absoluta. Configurarla en appsettings o con la variable de entorno Booking__BaseUrl.")
+            .ValidateOnStart();
         services.AddOptions<KeycloakOptions>()
-            .Bind(configuration.GetSection("Keycloak"));
+            .Bind(configuration.GetSection("Keycloak"))
+            .Validate(
+                o => Uri.TryCreate(o.TokenEndpoint, UriKind.Absolute, out _)
+                    && !string.IsNullOrWhiteSpace(o.ClientId)
+                    && !string.IsNullOrWhiteSpace(o.ClientSecret),
+                "Falta Keycloak:TokenEndpoint, Keycloak:ClientId o Keycloak:ClientSecret. Configurarlas en appsettings, o con las variables de entorno Keycloak__*.")
+            .ValidateOnStart();
 
         services.AddHttpContextAccessor();
         services.AddTransient<CorrelationIdHandler>();
         services.AddTransient<BookingAuthHandler>();
 
+        var availabilityDbConnectionString = configuration.GetConnectionString("AvailabilityDb");
+        if (string.IsNullOrWhiteSpace(availabilityDbConnectionString))
+        {
+            throw new InvalidOperationException(
+                "Falta ConnectionStrings:AvailabilityDb. Configurarla en appsettings.Development.json o con la variable de entorno ConnectionStrings__AvailabilityDb.");
+        }
+
         services.AddDbContext<AvailabilityDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("AvailabilityDb")));
+            options.UseNpgsql(availabilityDbConnectionString));
 
         services.AddScoped<IReservationRequestRepository, ReservationRequestRepository>();
         services.AddScoped<IEventRepository, EventRepository>();
