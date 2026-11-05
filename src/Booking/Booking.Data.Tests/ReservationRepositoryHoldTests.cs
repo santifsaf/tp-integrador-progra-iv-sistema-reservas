@@ -1,5 +1,6 @@
 using Booking.Data.Entities;
 using Booking.Data.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Booking.Data.Tests;
@@ -192,5 +193,28 @@ public class ReservationRepositoryHoldTests
             .GetByRequestIdAsync(first.RequestId, CancellationToken.None);
         Assert.NotNull(persisted);
         Assert.Equal(ReservationStatus.Held, persisted.Status);
+    }
+
+    [Fact]
+    public async Task TryHoldAsync_ErrorInesperado_SePropagaYNoDejaLaEntidadTrackeada()
+    {
+        await _fixture.ResetAsync();
+        await using var ctx = _fixture.CreateContext();
+        var repository = new ReservationRepository(ctx);
+
+        // Una moneda de más de 3 caracteres no entra en la columna varchar(3): Postgres rechaza el
+        // insert, pero NO es una violación de unicidad, así que el repositorio no la maneja y la propaga.
+        var reservation = TestData.BuildHeldReservation(currency: "ARGENTINA");
+
+        await Assert.ThrowsAsync<DbUpdateException>(
+            () => repository.TryHoldAsync(reservation, CancellationToken.None));
+
+        Assert.Empty(ctx.ChangeTracker.Entries());
+
+        // Y no quedó nada guardado.
+        await using var verifyContext = _fixture.CreateContext();
+        var persisted = await new ReservationRepository(verifyContext)
+            .GetByRequestIdAsync(reservation.RequestId, CancellationToken.None);
+        Assert.Null(persisted);
     }
 }
