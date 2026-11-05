@@ -25,6 +25,7 @@ http://localhost:8081/realms/seat-reservation/broker/github/endpoint
 ```bash
 cp infra/.env.example infra/.env
 # Dentro de .env, completar los parametros GITHUB_CLIENT_ID y GITHUB_CLIENT_SECRET (Pedir por el grupo o a Feli)
+# Para Availability, completar también MSG_BROKER_CONNECTION_STRING (ver sección Availability)
 docker compose -f infra/docker-compose.yml up -d
 ```
 
@@ -86,6 +87,86 @@ depends_on:
     condition: service_healthy
 ```
 
+## Availability
+
+La API (`availability-api`) y su base (`availability-db`) ya están en el compose:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --build availability-api
+```
+
+`availability-api` espera a que `availability-db` y `keycloak` estén healthy, así que el comando levanta los tres.
+
+- **API:** http://localhost:5100 (health en `/health`); dentro de la red de Docker, `availability-api:8080`.
+- **Migraciones y seed:** se aplican solos al iniciar la API; no hace falta `dotnet ef database update`.
+- **Base:** puerto del host `5433` (`AVAILABILITY_DB_PORT`); entre contenedores `availability-db:5432`.
+  Usuario, contraseña y base valen `availability` (`AVAILABILITY_DB_*`). Son valores de desarrollo local,
+  no secretos. Los datos viven en el volumen `availability-db-data`.
+
+### Configuración
+
+ASP.NET Core arma la configuración en capas; cada una pisa a la anterior:
+
+1. `appsettings.json`: valores comunes y direcciones **dentro de Docker** (`keycloak:8081`, `booking:8080`).
+2. `appsettings.Development.json`: solo con `dotnet run`; pisa las direcciones con `localhost`.
+3. user-secrets: solo en Development; secretos de cada integrante, fuera del repo.
+4. Variables de entorno (`Seccion__Clave`): en Docker las define `docker-compose.yml` con los valores de `infra/.env`.
+
+La API **no lee `infra/.env`**: ese archivo solo lo usa `docker compose` para reemplazar los `${VAR}`.
+
+| Clave                              | Docker                                         | Local (`dotnet run`)                                   |
+| ---------------------------------- | ---------------------------------------------- | ------------------------------------------------------ |
+| `ConnectionStrings:AvailabilityDb` | compose, con `AVAILABILITY_DB_*`               | `appsettings.Development.json` (`localhost:5433`)      |
+| `ServiceBus:ConnectionString`      | compose, con `MSG_BROKER_CONNECTION_STRING`    | **user-secrets**                                       |
+| `ServiceBus:TopicName`             | `appsettings.json` (`grupo5-booking-topic`)    | `appsettings.json`                                     |
+| `Keycloak:ClientSecret`            | compose, con `AVAILABILITY_CLIENT_SECRET`      | `appsettings.Development.json` (`availability-secret`) |
+| `Keycloak:TokenEndpoint`           | `appsettings.json` (`keycloak:8081`)           | `appsettings.Development.json` (`localhost:8081`)      |
+| `Booking:BaseUrl`                  | `appsettings.json` (`http://booking:8080/`)    | `appsettings.Development.json` (`http://localhost:5200/`) |
+| `JwtSettings:Authority`            | `appsettings.json` (`keycloak:8081`)           | `appsettings.Development.json` (`localhost:8081`)      |
+| `JwtSettings:Audience`             | `appsettings.json` (`availability`)            | `appsettings.json`                                     |
+
+Si falta la base, `ServiceBus`, `Booking` o `Keycloak`, la API no arranca y el log indica qué clave falta.
+
+### Secretos
+
+- **Connection string de Service Bus:** la entrega la cátedra y nunca va en un `appsettings`.
+  En Docker sale de `MSG_BROKER_CONNECTION_STRING` en `infra/.env`. En local se guarda en user-secrets,
+  una vez por máquina (mismo valor que en `.env`):
+
+  ```bash
+  dotnet user-secrets set "ServiceBus:ConnectionString" "<pedirla al grupo>" --project src/Availability/Availability.Api
+  ```
+
+  El repo solo guarda el `UserSecretsId` del `.csproj`; el valor queda en
+  `~/.microsoft/usersecrets/<id>/secrets.json` (Windows: `%APPDATA%\Microsoft\UserSecrets\<id>\secrets.json`).
+- **Secret del client `availability`:** Keycloak lo importa de `AVAILABILITY_CLIENT_SECRET` y en Docker la
+  API usa la misma variable. En local se usa `availability-secret` (el de `.env.example`); si se cambia en
+  `.env`, sobrescribirlo con `dotnet user-secrets set "Keycloak:ClientSecret" "<valor>" --project src/Availability/Availability.Api`.
+
+### Correr la API fuera de Docker
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --wait availability-db keycloak
+dotnet user-secrets set "ServiceBus:ConnectionString" "<pedirla al grupo>" --project src/Availability/Availability.Api
+dotnet run --project src/Availability/Availability.Api
+```
+
+Queda en http://localhost:5100 (perfil Development de `launchSettings.json`).
+
+### Migraciones y tests
+
+```bash
+dotnet ef migrations add <Nombre> \
+  --project src/Availability/Availability.Infrastructure \
+  --startup-project src/Availability/Availability.Api \
+  --output-dir Persistence/Migrations
+dotnet test src/Availability/Availability.Infrastructure.Tests
+```
+
+Los tests de repositorios levantan su propio PostgreSQL con Testcontainers: necesitan Docker, pero no
+`availability-db`.
+
+
 ## Login con GitHub
 
 La pantalla de login muestra un botón por cada identity provider habilitado (por ahora, GitHub).
@@ -141,4 +222,7 @@ desde la red de Docker. El Keycloak del compose ya habilita el backchannel diná
 para publicar también una dirección interna de las claves de firma (`jwks_uri`).
 Permitir metadata por HTTP es una configuración explícita del entorno local del TP.
 Fuera de Development, Booking exige HTTPS por defecto y mantiene la validación de
-issuer, audiencia, vencimiento y firma. El compose actual levanta Keycloak y el Postgres de Booking.
+issuer, audiencia, vencimiento y firma. El compose actual levanta Keycloak, el Postgres de Booking y Availability (API y base).
+
+Availability valida `aud=availability`. Dentro de Docker usa `JwtSettings:Authority=http://keycloak:8081/realms/seat-reservation`
+para leer la metadata; en local, `http://localhost:8081/realms/seat-reservation`.
