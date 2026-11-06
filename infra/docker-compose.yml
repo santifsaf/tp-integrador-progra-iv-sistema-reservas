@@ -71,6 +71,42 @@ services:
       timeout: 5s
       retries: 10
 
+  booking-api:
+    build:
+      # Contexto en la raíz del repo: Booking compila archivos de /contracts.
+      context: ..
+      dockerfile: src/Booking/Booking.Api/Dockerfile
+    environment:
+      ConnectionStrings__Booking: Host=booking-db;Port=5432;Database=${BOOKING_DB_NAME:-booking};Username=${BOOKING_DB_USER:-booking};Password=${BOOKING_DB_PASSWORD:-booking}
+      Database__MigrateOnStartup: "true"
+      # El issuer de los tokens es localhost:8081 (KC_HOSTNAME), así que Authority queda igual;
+      # las claves se descargan por la red interna de Docker con MetadataAddress.
+      Authentication__Authority: http://localhost:8081/realms/seat-reservation
+      Authentication__MetadataAddress: http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration
+      Authentication__RequireHttpsMetadata: "false"
+      Payment__Address: ${BOOKING_PAYMENT_ADDRESS:-http://host.docker.internal:5300}
+      Payment__TokenEndpoint: http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token
+      Payment__ClientSecret: ${BOOKING_CLIENT_SECRET}
+      # Connection string de Azure Service Bus: va SOLO en infra/.env (nunca en el repo).
+      # Si falta, solo este contenedor se detiene, con el mensaje "Falta Broker:ConnectionString".
+      Broker__ConnectionString: ${BOOKING_BROKER_CONNECTION_STRING:-}
+    # Dos réplicas leyendo la misma suscripción (competing consumers): cada mensaje lo
+    # procesa una sola, y la base evita la doble reserva. EF Core toma un lock al migrar,
+    # así que las dos réplicas pueden arrancar a la vez.
+    deploy:
+      replicas: 2
+    ports:
+      # Un puerto del host por réplica: 5200 y 5201.
+      - "${BOOKING_API_PORTS:-5200-5201}:8080"
+    extra_hosts:
+      # Permite llegar a Payment corriendo en el host (dotnet run) mientras no esté en el compose.
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      booking-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
   payment-db:
     image: postgres:17
     environment:
