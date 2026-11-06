@@ -96,7 +96,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+  payment-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${PAYMENT_DB_USER:-payment}
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD:-payment}
+      POSTGRES_DB: ${PAYMENT_DB_NAME:-payment}
+    ports:
+      # Puerto del host (configurable en infra/.env); dentro de la red de Docker siempre es 5432.
+      - "${PAYMENT_DB_PORT:-5434}:5432"
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PAYMENT_DB_USER:-payment} -d ${PAYMENT_DB_NAME:-payment}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   booking-db-data:
   availability-db-data:
+  payment-db-data:
