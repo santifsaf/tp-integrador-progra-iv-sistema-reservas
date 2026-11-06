@@ -76,7 +76,7 @@ Cada subgrupo aporta:
 1. Un `Dockerfile` en `src/<Servicio>/`. El build context es la raíz del repo, para poder copiar `/contracts`.
 2. Un bloque en `infra/docker-compose.yml` con el servicio y su base Postgres, vía PR.
 
-Dentro de Docker, los servicios llegan a Keycloak en `http://keycloak:8081` y entre ellos por nombre de servicio (por ejemplo, `http://booking:8080`).
+Dentro de Docker, los servicios llegan a Keycloak en `http://keycloak:8081` y entre ellos por nombre de servicio (por ejemplo, `http://booking-api:8080`).
 
 ---
 
