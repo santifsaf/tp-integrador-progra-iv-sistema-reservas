@@ -45,10 +45,11 @@ public class ReservationsController : ControllerBase
     /// <returns>
     /// 200 OK: Lista de solicitudes de reserva del usuario (puede estar vacía)
     /// 401 Unauthorized: Token JWT ausente o inválido
+    /// 503 Service Unavailable: Servicio de booking no disponible
     /// </returns>
     /// <remarks>
     /// Autenticación: Requerida (JWT Bearer token)
-    /// 
+    ///
     /// Ejemplo de request:
     /// ```
     /// GET /api/reservations
@@ -71,6 +72,7 @@ public class ReservationsController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<UserRequestSummaryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<IReadOnlyList<UserRequestSummaryDto>>> GetMyRequests(
         CancellationToken cancellationToken)
     {
@@ -109,6 +111,15 @@ public class ReservationsController : ControllerBase
                     result.Error,
                     userId,
                     correlationId);
+
+                if (result.Error == AppError.Unavailable)
+                {
+                    var unavailableResponse = new ErrorResponse(
+                        "SERVICE_UNAVAILABLE",
+                        "El servicio de booking no está disponible",
+                        correlationId);
+                    return StatusCode(StatusCodes.Status503ServiceUnavailable, unavailableResponse);
+                }
 
                 var internalErrorResponse = new ErrorResponse(
                     "INTERNAL_ERROR",
