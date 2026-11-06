@@ -26,7 +26,7 @@ http://localhost:8081/realms/seat-reservation/broker/github/endpoint
 cp infra/.env.example infra/.env
 # Dentro de .env, completar los parametros GITHUB_CLIENT_ID y GITHUB_CLIENT_SECRET (Pedir por el grupo o a Feli)
 # Para Availability, completar también MSG_BROKER_CONNECTION_STRING (ver sección Availability)
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d --build
 ```
 
 - Keycloak: http://localhost:8081 (consola de admin con `KC_ADMIN` / `KC_ADMIN_PASSWORD`, realm `master`)
@@ -76,11 +76,12 @@ dotnet test src/Booking/Booking.Data.Tests
 Los tests aplican las migraciones solos sobre `booking_tests` y requieren `booking-db` levantado. Para
 ejecutar el resto sin la base: `dotnet test --filter "Category!=Integration"`.
 
-Al incorporar Booking al compose, configurar en su servicio (el host es el nombre del servicio, no `localhost`):
+Booking ya está en el compose como `booking-api`. Su servicio usa el nombre `booking-db` (no `localhost`) y espera a que la base esté sana:
 
 ```yaml
 environment:
   ConnectionStrings__Booking: Host=booking-db;Port=5432;Database=booking;Username=booking;Password=booking
+  Database__MigrateOnStartup: "true"
 depends_on:
   booking-db:
     condition: service_healthy
@@ -379,15 +380,43 @@ solo necesitan Docker en ejecución, no `payment-db`.
 - Payment valida los tokens que recibe: `aud=payment` y solo acepta llamadas del client `booking`.
   Quien llama a Payment (Booking) usa su propio secret, `BOOKING_CLIENT_SECRET`.
 
-Al incorporar Payment al compose, configurar en su servicio (el host es el nombre del servicio, no `localhost`):
+### Payment API
+
+Payment ya está en el compose como `payment-api`:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --build payment-api
+```
+
+- **Puerto:** `localhost:5300` (configurable con `PAYMENT_API_PORT`). Dentro de Docker escucha en `8080`.
+- **Base:** usa `payment-db:5432`; al arrancar aplica las migraciones porque el compose define
+  `Database__MigrateOnStartup=true`.
+- **Keycloak:** valida el issuer público `http://localhost:8081/realms/seat-reservation` y descarga
+  la metadata por `http://keycloak:8081/...`.
+- **Health:** el endpoint `/health` comparte el puerto gRPC y solo habla HTTP/2:
+
+```bash
+curl --http2-prior-knowledge http://localhost:5300/health
+```
+
+La configuración equivalente del servicio es:
 
 ```yaml
 environment:
   ConnectionStrings__Payment: Host=payment-db;Port=5432;Database=payment;Username=payment;Password=payment
+  Database__MigrateOnStartup: "true"
+  Keycloak__Authority: http://localhost:8081/realms/seat-reservation
+  Keycloak__MetadataAddress: http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration
+  Keycloak__RequireHttpsMetadata: "false"
 depends_on:
   payment-db:
     condition: service_healthy
+  keycloak:
+    condition: service_healthy
 ```
+
+Booking apunta a `http://payment-api:8080` por defecto. Si ejecutás Payment con `dotnet run`, cambiá
+`BOOKING_PAYMENT_ADDRESS` a `http://host.docker.internal:5300` en `infra/.env`.
 
 ## Login con GitHub
 
@@ -430,7 +459,7 @@ curl -s http://localhost:8081/realms/seat-reservation/protocol/openid-connect/to
   `http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration`.
 - Audience: el `clientId` del servicio que recibe la llamada (por ejemplo, Booking valida `aud=booking`).
 
-Al incorporar Booking al compose, configurar estas variables en su servicio:
+Booking ya está en el compose (`booking-api`) con estas variables en su servicio:
 
 ```yaml
 environment:
@@ -444,7 +473,7 @@ desde la red de Docker. El Keycloak del compose ya habilita el backchannel diná
 para publicar también una dirección interna de las claves de firma (`jwks_uri`).
 Permitir metadata por HTTP es una configuración explícita del entorno local del TP.
 Fuera de Development, Booking exige HTTPS por defecto y mantiene la validación de
-issuer, audiencia, vencimiento y firma. El compose actual levanta Keycloak, el Postgres de Booking y Availability (API y base).
+issuer, audiencia, vencimiento y firma. El compose actual levanta Keycloak, las bases de Booking, Availability y Payment, y las APIs `booking-api`, `availability-api` y `payment-api`.
 
 Availability valida `aud=availability`. Dentro de Docker usa `JwtSettings:Authority=http://keycloak:8081/realms/seat-reservation`
 para leer la metadata; en local, `http://localhost:8081/realms/seat-reservation`.

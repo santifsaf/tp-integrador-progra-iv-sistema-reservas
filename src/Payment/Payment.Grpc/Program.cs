@@ -54,4 +54,14 @@ app.MapGet("/health", () => Results.Ok(new { service = "Payment", status = "ok" 
 // La autenticación y autorización se aplican mediante la configuración de Kevin.
 app.MapGrpcService<PaymentGrpcService>();
 
+// Migración inicial apagada por defecto; se activa con Database__MigrateOnStartup=true
+// en el compose. Va antes de app.Run() para que la tabla payments exista cuando
+// empiecen a llegar llamadas gRPC.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 app.Run();

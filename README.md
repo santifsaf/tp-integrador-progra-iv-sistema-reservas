@@ -46,10 +46,10 @@ Comunicación entre servicios:
 
 ```bash
 cp infra/.env.example infra/.env   # completar los valores pendientes
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d --build
 ```
 
-El docker compose levanta Keycloak en http://localhost:8081 y el Postgres de Booking en localhost:5432 y PostgreSQL para Availability en el puerto host 5433. El contenedor de la API Availability todavía no está agregado; por eso la conexión local usa `localhost:5433`, y dentro de Docker la API deberá usar `availability-db:5432`. Detalle de configuración de Keycloak, clients y cómo pedir un token: [`infra/README.md`](infra/README.md).
+El docker compose levanta Keycloak en http://localhost:8081, las bases PostgreSQL de Booking (`localhost:5432`), Availability (`localhost:5433`) y Payment (`localhost:5434`), y las APIs `booking-api` (puertos 5200-5201) y `payment-api` (`localhost:5300`, gRPC/HTTP2). El contenedor de la API Availability todavía no está agregado; por eso la conexión local usa `localhost:5433`, y dentro de Docker la API deberá usar `availability-db:5432`. Detalle de configuración de Keycloak, clients y cómo pedir un token: [`infra/README.md`](infra/README.md).
 
 ## Compilar y ejecutar en local
 
@@ -67,7 +67,7 @@ dotnet run --project src/Payment/Payment.Grpc                # http://localhost:
 dotnet run --project src/Notifications/Notifications.Worker
 ```
 
-Todos los hosts HTTP exponen `GET /health`.
+Booking y Availability exponen `GET /health` por HTTP. Payment expone `/health` en el mismo puerto gRPC, así que hay que consultarlo con HTTP/2: `curl --http2-prior-knowledge http://localhost:5300/health`.
 
 ## Sumar un servicio al docker-compose
 
@@ -76,7 +76,7 @@ Cada subgrupo aporta:
 1. Un `Dockerfile` en `src/<Servicio>/`. El build context es la raíz del repo, para poder copiar `/contracts`.
 2. Un bloque en `infra/docker-compose.yml` con el servicio y su base Postgres, vía PR.
 
-Dentro de Docker, los servicios llegan a Keycloak en `http://keycloak:8081` y entre ellos por nombre de servicio (por ejemplo, `http://booking-api:8080`).
+Dentro de Docker, los servicios llegan a Keycloak en `http://keycloak:8081` y entre ellos por nombre de servicio (por ejemplo, `http://booking-api:8080`, `http://availability-api:8080` o `http://payment-api:8080`).
 
 ---
 
