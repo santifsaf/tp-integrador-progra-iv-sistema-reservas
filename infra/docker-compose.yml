@@ -1,0 +1,191 @@
+name: seat-reservation
+
+services:
+  availability-db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${AVAILABILITY_DB_NAME:-availability}
+      POSTGRES_USER: ${AVAILABILITY_DB_USER:-availability}
+      POSTGRES_PASSWORD: ${AVAILABILITY_DB_PASSWORD:-availability}
+    ports:
+      # Puerto del host (configurable en infra/.env); dentro de la red de Docker siempre es 5432.
+      - "${AVAILABILITY_DB_PORT:-5433}:5432"
+    volumes:
+      - availability-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AVAILABILITY_DB_USER:-availability} -d ${AVAILABILITY_DB_NAME:-availability}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_PORT: "8081"
+      KC_HEALTH_ENABLED: "true"
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      AVAILABILITY_CLIENT_SECRET: ${AVAILABILITY_CLIENT_SECRET}
+      BOOKING_CLIENT_SECRET: ${BOOKING_CLIENT_SECRET}
+      PAYMENT_CLIENT_SECRET: ${PAYMENT_CLIENT_SECRET}
+      NOTIFICATIONS_CLIENT_SECRET: ${NOTIFICATIONS_CLIENT_SECRET}
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import:ro
+    healthcheck:
+      # La imagen no trae curl: se consulta /health/ready del puerto de management con bash.
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+
+
+  booking-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${BOOKING_DB_USER:-booking}
+      POSTGRES_PASSWORD: ${BOOKING_DB_PASSWORD:-booking}
+      POSTGRES_DB: ${BOOKING_DB_NAME:-booking}
+    ports:
+      # Puerto del host (configurable en infra/.env); dentro de la red de Docker siempre es 5432.
+      - "${BOOKING_DB_PORT:-5432}:5432"
+    volumes:
+      - booking-db-data:/var/lib/postgresql/data
+      # Crea la base booking_tests (la usa Booking.Data.Tests) la primera vez que se inicia el volumen.
+      - ./postgres/booking/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BOOKING_DB_USER:-booking} -d ${BOOKING_DB_NAME:-booking}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  availability-api:
+    build:
+      context: ..
+      dockerfile: src/Availability/Availability.Api/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:8080
+      - Keycloak__ClientSecret=${AVAILABILITY_CLIENT_SECRET}
+      - ConnectionStrings__AvailabilityDb=Host=availability-db;Port=5432;Database=${AVAILABILITY_DB_NAME:-availability};Username=${AVAILABILITY_DB_USER:-availability};Password=${AVAILABILITY_DB_PASSWORD:-availability}
+      - ServiceBus__ConnectionString=${MSG_BROKER_CONNECTION_STRING}
+    ports:
+      - "5100:8080"
+    depends_on:
+      availability-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - default
+    healthcheck:
+      # La imagen no trae curl y su /bin/sh (dash) no soporta /dev/tcp: se consulta /health con bash.
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.1 200' <&3",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  booking-api:
+    build:
+      # Contexto en la raíz del repo: Booking compila archivos de /contracts.
+      context: ..
+      dockerfile: src/Booking/Booking.Api/Dockerfile
+    environment:
+      ConnectionStrings__Booking: Host=booking-db;Port=5432;Database=${BOOKING_DB_NAME:-booking};Username=${BOOKING_DB_USER:-booking};Password=${BOOKING_DB_PASSWORD:-booking}
+      Database__MigrateOnStartup: "true"
+      # El issuer de los tokens es localhost:8081 (KC_HOSTNAME), así que Authority queda igual;
+      # las claves se descargan por la red interna de Docker con MetadataAddress.
+      Authentication__Authority: http://localhost:8081/realms/seat-reservation
+      Authentication__MetadataAddress: http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration
+      Authentication__RequireHttpsMetadata: "false"
+      # Payment corre en el compose como payment-api. Si se ejecuta Payment con
+      # dotnet run en el host, override BOOKING_PAYMENT_ADDRESS con
+      # http://host.docker.internal:5300.
+      Payment__Address: ${BOOKING_PAYMENT_ADDRESS:-http://payment-api:8080}
+      Payment__TokenEndpoint: http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token
+      Payment__ClientSecret: ${BOOKING_CLIENT_SECRET}
+      # Connection string de Azure Service Bus: va SOLO en infra/.env (nunca en el repo).
+      # Si falta, solo este contenedor se detiene, con el mensaje "Falta Broker:ConnectionString".
+      Broker__ConnectionString: ${BOOKING_BROKER_CONNECTION_STRING:-}
+    # Dos réplicas leyendo la misma suscripción (competing consumers): cada mensaje lo
+    # procesa una sola, y la base evita la doble reserva. EF Core toma un lock al migrar,
+    # así que las dos réplicas pueden arrancar a la vez.
+    deploy:
+      replicas: 2
+    ports:
+      # Un puerto del host por réplica: 5200 y 5201.
+      - "${BOOKING_API_PORTS:-5200-5201}:8080"
+    extra_hosts:
+      # Permite usar un Payment local (dotnet run) si se override BOOKING_PAYMENT_ADDRESS.
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      booking-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      payment-api:
+        condition: service_started
+
+  payment-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${PAYMENT_DB_USER:-payment}
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD:-payment}
+      POSTGRES_DB: ${PAYMENT_DB_NAME:-payment}
+    ports:
+      # Puerto del host (configurable en infra/.env); dentro de la red de Docker siempre es 5432.
+      - "${PAYMENT_DB_PORT:-5434}:5432"
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PAYMENT_DB_USER:-payment} -d ${PAYMENT_DB_NAME:-payment}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  payment-api:
+    build:
+      # Contexto en la raíz del repo: Payment compila /contracts/proto/payment.proto.
+      context: ..
+      dockerfile: src/Payment/Payment.Grpc/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Payment: Host=payment-db;Port=5432;Database=${PAYMENT_DB_NAME:-payment};Username=${PAYMENT_DB_USER:-payment};Password=${PAYMENT_DB_PASSWORD:-payment}
+      Database__MigrateOnStartup: "true"
+      # El issuer de los tokens es localhost:8081 (KC_HOSTNAME), así que Authority
+      # conserva la URL pública. Dentro de Docker la metadata se pide por keycloak.
+      Keycloak__Authority: http://localhost:8081/realms/seat-reservation
+      Keycloak__MetadataAddress: http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration
+      Keycloak__RequireHttpsMetadata: "false"
+      Keycloak__Audience: payment
+    ports:
+      # El host usa 5300; dentro de la red de Docker Payment escucha en 8080.
+      - "${PAYMENT_API_PORT:-5300}:8080"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+volumes:
+  booking-db-data:
+  availability-db-data:
+  payment-db-data:

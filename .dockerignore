@@ -1,0 +1,25 @@
+**/bin/
+**/obj/
+**/logs/
+**/TestResults/
+**/*.user
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+
+.git/
+.vs/
+.vscode/
+
+infra/.env
+**/.env
+# Evita mandar al build de Docker compilados locales, secretos y archivos de IDE.
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/.env
+**/secrets.json
+**/node_modules/
+.git/

@@ -1,0 +1,49 @@
+using Availability.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Testcontainers.PostgreSql;
+using Xunit;
+
+namespace Availability.Infrastructure.Tests;
+
+public sealed class PostgreSqlFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
+        .WithImage("postgres:17-alpine")
+        .Build();
+
+    public string ConnectionString => _container.GetConnectionString();
+
+    public async Task InitializeAsync()
+    {
+        await _container.StartAsync();
+        await using var db = CreateDbContext();
+        await db.Database.EnsureCreatedAsync();
+    }
+
+    public async Task DisposeAsync() => await _container.DisposeAsync();
+
+    public AvailabilityDbContext CreateDbContext(string? databaseName = null)
+    {
+        var connectionString = ConnectionString;
+        if (databaseName is not null)
+        {
+            var builder = new NpgsqlConnectionStringBuilder(connectionString)
+            {
+                Database = databaseName
+            };
+            connectionString = builder.ConnectionString;
+        }
+
+        var options = new DbContextOptionsBuilder<AvailabilityDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+        return new AvailabilityDbContext(options);
+    }
+}
+
+[CollectionDefinition(Name)]
+public sealed class PostgreSqlCollection : ICollectionFixture<PostgreSqlFixture>
+{
+    public const string Name = "PostgreSQL";
+}

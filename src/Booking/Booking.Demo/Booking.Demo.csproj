@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <!-- Simulador local para probar la lógica de Booking sin Azure, Postgres ni Payment.
+       No forma parte de la solución que se despliega: solo usa las capas reales
+       (Business y Data) con dobles en memoria alrededor. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Booking.Business/Booking.Business.csproj" />
+    <!-- Para el modo azure: usa el consumidor real de Booking.Api/Messaging. -->
+    <ProjectReference Include="../Booking.Api/Booking.Api.csproj" />
+  </ItemGroup>
+</Project>
