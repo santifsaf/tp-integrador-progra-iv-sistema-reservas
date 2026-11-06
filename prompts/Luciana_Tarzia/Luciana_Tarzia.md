@@ -1,0 +1,679 @@
+# Prompts de Desarrollo - Luciana Tarzia
+**Proyecto:** Sistema distribuido de reserva de asientos para eventos (TP Programación 4 - TUP)  
+**Componente:** Availability.Api  
+**Fecha de inicio:** 29 de octubre de 2026
+
+---
+
+## Prompt 1: Especificación y Plan de Desarrollo - Availability.Api
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** 29 de octubre de 2026  
+**Objetivo:** Estructurar un plan de desarrollo paso a paso, realista y directo al grano, para el microservicio `Availability.Api`.
+
+### Contenido del Prompt Original:
+
+```
+Necesito que actúes como un Tech Lead Senior en .NET y me ayudes a estructurar un plan de desarrollo 
+paso a paso, realista y directo al grano, para el microservicio Availability.Api de un TP universitario 
+de microservicios. Crea un MD con el plan de desarrollo y la salida de este prompt para hacer seguimiento 
+del mismo. No quiero que cambies código sin mi permiso. Yo voy a orquestar el desarrollo.
+
+Quiero que te ciñas estrictamente a los requisitos del proyecto sin agregar patrones complejos innecesarios 
+(como Outbox, CQRS complejo o librerías externas no solicitadas).
+
+### 1. Rol y Contexto
+- **Proyecto:** Sistema distribuido de reserva de asientos para eventos (TP Programación 4 - TUP).
+- **Componente a desarrollar:** `Availability.Api` (Capa de Presentación / REST API).
+- **Arquitectura del microservicio:** Clean Architecture + Dominio Anémico.
+- **Responsabilidad de este componente:** Es la puerta de entrada pública. Recibe consultas de disponibilidad, 
+  valida solicitudes de reserva, registra el intento, lo envía de forma asíncrona a la capa de aplicación/broker 
+  y devuelve una respuesta inmediata sin esperar al cobro ni al procesamiento de `Booking`.
+
+### 2. Definición Clara de la Funcionalidad
+
+#### Objetivo Principal:
+Permitir a los usuarios consultar asientos de un evento, solicitar la reserva de un único asiento recibiendo 
+una respuesta asíncrona inmediata (202 Accepted) y consultar el estado de su solicitud.
+
+#### Criterios de Aceptación (AC):
+- **AC1 (Consulta):** `GET /api/events/{eventId}/seats` es público (sin autenticación) y retorna la lista 
+  de asientos con su estado conocido.
+- **AC2 (Solicitud de reserva - Alcance limitado):** `POST /api/reservations` requiere autenticación JWT. 
+  Acepta **únicamente 1 asiento por reserva** (`SeatId` individual, no colecciones/listas).
+- **AC3 (Respuesta asíncrona):** `POST /api/reservations` valida el modelo, extrae el `UserId` del token JWT, 
+  invoca el caso de uso `CreateReservationRequestUseCase` y responde de inmediato con `HTTP 202 Accepted` 
+  conteniendo `{ requestId, status: "RECEIVED" }`.
+- **AC4 (Seguimiento):** `GET /api/reservations/{requestId}` permite consultar el estado actual de la solicitud 
+  delegando en la capa de aplicación.
+- **AC5 (Autenticación JWT):** Valida tokens emitidos por Keycloak. Si el token es inválido o falta, 
+  retorna `HTTP 401 Unauthorized`.
+- **AC6 (Trazabilidad y Auditoría - Punto 3f):** Incluye un Middleware de Correlation ID. Si viene el header 
+  `X-Correlation-ID`, lo conserva; si no, genera un nuevo `Guid`. Debe registrar logs de auditoría al recibir 
+  el request y al emitir la respuesta 202 Accepted.
+
+#### Material de Referencia / Contratos de DTOs:
+
+*Request POST /api/reservations:*
+```json
+{
+  "eventId": 10,
+  "seatId": 15
+}
+```
+
+*Response 202 Accepted:*
+```json
+{
+  "requestId": "a4f1-8902-4b21-9a2f",
+  "status": "RECEIVED",
+  "message": "Solicitud recibida correctamente"
+}
+```
+
+### 3. Stack Tecnológico y Restricciones
+
+#### Tecnologías Exactas:
+- **Framework:** .NET 8 / ASP.NET Core Web API.
+- **Autenticación:** `Microsoft.AspNetCore.Authentication.JwtBearer` (Keycloak).
+- **Logging:** `ILogger` nativo de .NET con Serilog o Console Logger.
+
+#### Patrones y Convenciones:
+- **Clean Architecture:** `Availability.Api` solo depende de `Availability.Application` y `Availability.Domain`. 
+  No conoce la base de datos ni los clientes concretos de infraestructura.
+- **Controllers delgados (Thin Controllers):** Los controladores no tienen lógica de negocio ni de validación 
+  compleja; solo reciben DTOs, extraen claims, invocan casos de uso y devuelven `IActionResult`.
+- **Dominio Anémico:** Clases de entidad simples con getters/setters auto-implementados.
+
+#### Lo que NO debes hacer:
+- **NO** permitas listas o arreglos de asientos (`List<int> SeatIds`). Solo 1 asiento por reserva.
+- **NO** agregues lógica de base de datos (EF Core) ni clientes de Azure Service Bus dentro del proyecto `Availability.Api`.
+- **NO** crees patrones complejos como Transactional Outbox, CQRS con MediatR o gRPC en este microservicio.
+- **NO** hagas llamadas síncronas bloqueantes a `Booking` o `Payment` para procesar el pago durante el `POST`.
+
+### 4. Desglose del Plan de Desarrollo
+Necesito que dividas el plan de trabajo en **fases lógicas y secuenciales**, estimando el tiempo en horas 
+para cada una:
+
+1. **Fase 1: Setup, DTOs y Middlewares base** (Correlation ID Middleware e ILogger).
+2. **Fase 2: Configuración de Autenticación y Autorización JWT** (Program.cs e integración con Keycloak).
+3. **Fase 3: Implementación de Controladores y Endpoints** (Endpoints de consulta, solicitud 202 Accepted y seguimiento).
+4. **Fase 4: Inyección de Dependencias y Manejo de Errores** (Conexión de la API con los casos de uso mockeados/reales 
+   e Inyección de Dependencias).
+
+### 5. Formato de Salida Esperado
+Devuélveme la respuesta estructurada de la siguiente manera:
+
+1. **Listado paso a paso numerado** organizado por las 4 fases solicitadas.
+2. **Estimación de tiempo** por cada fase y tiempo total del componente.
+3. **Bloques de código de ejemplo** únicamente para las partes críticas (`CorrelationIdMiddleware`, extracción 
+   de `UserId` de Claims JWT en el controller y configuración de `AddJwtBearer` en `Program.cs`).
+```
+
+### Aclaraciones Posteriores (Actualizaciones):
+
+1. **Manejo de IDs con GUID:**
+   - `RequestId`: Se genera como `Guid.NewGuid()` al crear la solicitud de reserva
+   - `CorrelationId`: Se genera como `Guid.NewGuid().ToString("N")` si no viene en el header
+   - `EventId` y `SeatId`: Recibidos como `int` en DTOs
+   - Formato de respuesta: GUIDs como strings en formato UUID estándar
+
+### Resultado Entregado:
+
+**Archivo:** `PLAN_DESARROLLO_AVAILABILITY_API.md`
+
+**Contenido principal:**
+- ✅ 4 fases estructuradas con estimación de tiempo (9 horas totales)
+- ✅ Paso a paso detallado con sub-fases
+- ✅ Código de ejemplo para componentes críticos:
+  - `CorrelationIdMiddleware.cs`
+  - Configuración `AddJwtBearer()` en `Program.cs`
+  - Extracción de `UserId` desde JWT claims
+  - `ExceptionHandlingMiddleware.cs`
+- ✅ Checklist de completación por fase
+- ✅ Estructura final de archivos esperados
+- ✅ Criterios de Aceptación mapeados a endpoints
+
+
+---
+
+## Prompt 2: Ejecución Fase 1.1 - Crear DTOs
+
+**Solicitado por:** Luciana Tarzia  
+**Objetivo:** Iniciar desarrollo de Fase 1, Paso 1.1 - Crear estructura de carpetas y DTOs
+
+### Contenido del Prompt:
+
+```
+arranquemos con fase 1 del desarrollo. vamos primero con 1.1. lee md adjunto para contexto
+```
+
+### Contexto Proporcionado:
+- Referencia: `PLAN_DESARROLLO_AVAILABILITY_API.md`
+- Expectativa: Crear 4 DTOs con estructura de carpetas Requests/Responses
+
+### Resultado Entregado:
+
+**Archivos Creados:**
+- ✅ `src/Availability/Availability.Api/DTOs/Requests/CreateReservationRequest.cs`
+- ✅ `src/Availability/Availability.Api/DTOs/Responses/ReservationResponse.cs`
+- ✅ `src/Availability/Availability.Api/DTOs/Responses/GetSeatsResponse.cs`
+- ✅ `src/Availability/Availability.Api/DTOs/Responses/GetReservationStatusResponse.cs`
+
+**Propiedades implementadas:**
+- `CreateReservationRequest`: `EventId` (int), `SeatId` (int)
+- `ReservationResponse`: `RequestId` (string), `Status` (string), `Message` (string)
+- `GetSeatsResponse`: `SeatId` (int), `Status` (string), `EventId` (int)
+- `GetReservationStatusResponse`: `RequestId` (string), `Status` (string), `CreatedAt` (DateTime), `UpdatedAt` (DateTime)
+
+**Validación:** Compilación exitosa sin errores.
+
+---
+
+## Prompt 3: Actualización Plan - Fase 1.1 Completada
+
+**Solicitado por:** Luciana Tarzia  
+**Objetivo:** Registrar completación de Fase 1.1 en el plan de desarrollo
+
+### Contenido del Prompt:
+
+```
+actualiza el plan de desarrollo con el checklist de fase 1.1 completado y hace un muy pequeño resumen 
+de los cambios
+```
+
+### Cambios Realizados en PLAN_DESARROLLO_AVAILABILITY_API.md:
+
+- ✅ Agregado checkmark `✅ COMPLETADO` en Paso 1.1
+- ✅ Actualizado estado: "DTOs a crear" → "DTOs creados"
+- ✅ Agregado resumen conciso: "Creadas 4 clases DTO con propiedades documentadas, estructura de carpetas organizadas por tipo de transferencia (Requests/Responses). Compilación exitosa."
+- ✅ Cambio de métrica: "Tiempo estimado" → "Tiempo real: 0.5 horas"
+
+---
+
+## Prompt 4: Implementación Fase 1.2 - Correlation ID Middleware
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Ejecución post-Fase 1.1  
+**Objetivo:** Implementar el Correlation ID Middleware y compilar sin errores
+
+### Prompts Ejecutados:
+
+```
+arranquemos con fase 1.2 del plan de desarrollo. leé todo el # adjunto para contexto. 
+una vez finalizado el desarrollo validá cambios con compilación
+```
+
+### Resultado Entregado:
+
+- ✅ Archivo creado: `Middleware/CorrelationIdMiddleware.cs` (completo y funcional)
+- ✅ Program.cs actualizado con `using` e `app.UseMiddleware<CorrelationIdMiddleware>();`
+- ✅ Compilación exitosa (sin advertencias en segunda compilación tras corrección de nullable reference)
+- ✅ Middleware registrado ANTES de `MapControllers()` (orden correcto)
+- ✅ Logs de auditoría implementados (recepción y respuesta)
+
+---
+
+```
+actualiza plan de desarrollo de la fase 1.2 finalizada y hace un pequeño resumen 
+de los cambios. fijate el checklist tambien de la linea 544.
+```
+
+### Resultado Entregado:
+
+- ✅ Paso 1.2 actualizado con estado **COMPLETADO**
+- ✅ Agregada sección "Cambios Realizados" con 2 sub-items (archivo creado + archivo actualizado)
+- ✅ Agregada sección "Validación" mostrando compilación exitosa
+- ✅ Tiempo real actualizado: 0.5 horas
+- ✅ Checklist actualizado:
+  - Fase 1: Marcadas [x] items 1, 2 y 3 / [ ] item 4 (Paso 1.3 pendiente)
+  - Agregadas notas clarificadoras ("PASO 1.2 COMPLETADO", "Paso 1.3 - PENDIENTE")
+
+---
+
+## Prompt 5: Implementación Fase 1.3 - Configurar Logging Base
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Ejecución post-Fase 1.2  
+**Objetivo:** Configurar Serilog como proveedor de logging en Program.cs y registrar dependencias NuGet
+
+### Prompts Ejecutados:
+
+```
+arranquemos con fase 1.3 del plan de desarrollo. leé todo el # adjunto para contexto.
+una vez finalizado el desarrollo validá cambios con compilación
+```
+
+### Resultado Entregado:
+
+**Cambios Implementados:**
+
+1. **Program.cs - Configuración completa de Serilog:**
+   - ✅ Limpieza de proveedores por defecto (`ClearProviders()`)
+   - ✅ Serilog registrado como proveedor principal de logging
+   - ✅ Nivel mínimo: **Information** (Development + Production)
+   - ✅ Doble salida: Consola + Archivo con rotación diaria (`logs/availability-api-{date}.txt`)
+   - ✅ Template estructurado: `[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}`
+   - ✅ Enrich: `FromLogContext()` + Propiedad `{ Service: "Availability.Api" }`
+   - ✅ Gestión del ciclo de vida: Try-catch-finally con logs de auditoría
+     - `Log.Information("Iniciando aplicación Availability.Api")`
+     - `Log.Fatal(ex, "La aplicación terminó inesperadamente")`
+     - `Log.CloseAndFlush()` para garantía de escritura
+
+2. **Availability.Api.csproj - Dependencias NuGet agregadas:**
+   - ✅ `Serilog` v4.0.0
+   - ✅ `Serilog.AspNetCore` v8.0.0
+   - ✅ `Serilog.Sinks.Console` v6.0.0
+   - ✅ `Serilog.Sinks.File` v5.0.0
+
+**Validación:** 
+- ✅ Compilación exitosa sin errores
+- ✅ Paquetes NuGet compatible con .NET 8/10
+- ✅ Logs disponibles en consola y archivo automáticamente
+- ✅ Integración con Correlation ID Middleware lista
+
+**Tiempo real:** 0.5 horas
+
+---
+
+```
+actualiza plan de desarrollo de la fase 1.3 finalizada y hace un pequeño resumen 
+de los cambios. fijate el checklist tambien de la linea 544.
+```
+
+### Resultado Entregado:
+
+- ✅ Paso 1.3 actualizado con estado **COMPLETADO**
+- ✅ Agregada sección "Cambios Realizados" con 2 archivos (Program.cs + .csproj)
+- ✅ Agregada sección "Validación" con compilación exitosa
+- ✅ Tiempo real actualizado: 0.5 horas
+- ✅ Subtotal Fase 1 actualizado a: **1.5 horas (cronometrado)**
+- ✅ Checklist actualizado:
+  - Fase 1: Marcada como **✅ COMPLETADA** (no "Parcialmente")
+  - Paso 1.3 ahora indica **✅ COMPLETADO** con detalle "(Serilog + Paquetes NuGet)"
+  - Próximo hito: FASE 2 - Autenticación JWT
+
+---
+
+## Prompt 6: Ejecución Fase 2.1 - Agregar Paquetes NuGet JWT
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.1 - Agregar paquetes NuGet necesarios para autenticación JWT
+
+### Contenido del Prompt Original:
+
+```
+arrancamos con la fase 2 del desarrollo. lee todo el archivo que te adjunto que es el plan de desarrollo 
+y empezamos con la fase 2.1. una vez hechos los cambios valida compilando el proyecto.
+```
+```
+lee todo el plan de desarrollo que te adjunto y actualiza la fase 2.1 con una pequeña descripcion. tambien en el checklist del final, linea 695
+```
+
+### Resultado Entregado:
+
+**Archivos Modificados:**
+1. `src/Availability/Availability.Api/Availability.Api.csproj`
+
+**Cambios Realizados:**
+- ✅ Agregado `Microsoft.AspNetCore.Authentication.JwtBearer` v8.0.0
+- ✅ Agregado `System.IdentityModel.Tokens.Jwt` v7.1.2 (compatible con v7.1.x)
+
+**Características:**
+- Paquete JwtBearer: Valida JWT en cada request automáticamente
+- Paquete IdentityModel.Tokens: Lee y extrae información desde JWT (claims, roles, etc.)
+
+**Validación:**
+- ✅ Compilación exitosa sin errores de sintaxis
+- ✅ Todas las dependencias resueltas correctamente
+- ✅ Proyecto compila en 48.7 segundos
+- ⚠️ 2 advertencias menores sobre resolución de versiones (no afecta funcionalidad)
+
+**Tiempo real:** 0.25 horas
+
+**Próximo paso:** Fase 2.2 - Configuración JWT en appsettings.json
+
+**Estado Fase 2.1:** ✅ COMPLETADA
+
+
+## Prompt 7: Ejecución Fase 2.2 - Configurar `appsettings.json` con JWT Settings
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.1 - Agregar paquetes NuGet necesarios para autenticación JWT
+
+### Contenido del Prompt Original:
+
+```
+lee todo el archivo que te adjunto que es el plan de desarrollo y empezamos con la fase 2.2. una vez hechos los cambios valida compilando el proyecto.
+```
+```
+agrega en el plan de desarollo la finalizacion de fase 2.2. primero lee el archivo y despues agrega pequeña descripcion de lo cambiado. tene en cuenta que en la linea 707 hay un checklist
+```
+
+### Resultado Entregado:
+Se agregó la sección `JwtSettings` en `appsettings.json` con configuración para validar tokens JWT desde Keycloak. La configuración incluye:
+- **Authority:** `http://keycloak:8081/realms/seat-reservation` (Docker) - se sobrescribe a `http://localhost:8081/realms/seat-reservation` en `appsettings.Development.json`
+- **Audience:** `availability-api` (validar que el JWT es para este servicio)
+- **RequireHttpsMetadata:** `false` (desarrollo)
+- **ValidateIssuerSigningKey:** `true` (verifica firma del JWT)
+- **ValidateLifetime:** `true` (rechaza JWTs expirados)
+
+**Archivos Modificados:**
+- `src/Availability/Availability.Api/appsettings.json` → Configuración base (todos los parámetros)
+- `src/Availability/Availability.Api/appsettings.Development.json` → Override solo de Authority (merge automático)
+
+**Validación:**
+- ✅ Compilación exitosa
+- ✅ Configuración correcta según infraestructura de Keycloak (repo de Feli)
+- ✅ JSON válido y accesible desde `Program.cs` mediante `GetSection("JwtSettings")`
+
+**Tiempo real:** 0.5 horas
+
+
+
+## Prompt 7: Ejecución Fase 2
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.3 - Implementar `AddJwtBearer()` en `Program.cs`
+
+### Contenido del Prompt Original:
+
+```
+vamos con la fase 2.3 del desarrollo. lee todo el plan de desarrollo de contexto y ejecuta lo que hay que hacer. valida compilacion al final de los cambios.
+
+```
+### Resultado Entregado: ver plan de desarrollo para detalles. 
+
+
+## Prompt 8: Ejecución Fase 2
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.4 - Crear política de autorización
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 2.4 del plan de desarrollo. leelo todo y despues aplica cambios. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado:
+	src/Availability/Availability.Api/Extensions/ClaimsPrincipalExtensions.cs
+	Herramientas para extraer información del JWT
+	Métodos: GetUserId(), GetEmail(), GetName(), GetRoles(), HasValidUserId(), HasRole(), GetClaimValue()
+
+
+## Prompt 9: Ejecución Fase 2
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 2  
+**Objetivo:** Ejecutar Fase 2.5 - Validación de componentes
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 2.5 del plan de desarrollo. leelo todo y despues aplica cambios. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado:
+	Documentación Práctica de Uso
+	**Archivo:** `src/Availability/Availability.Api/USAGE_GUIDE_CLAIMS_EXTENSIONS.md`
+
+	Se creó una guía completa que incluye:
+
+	- Explicación de cada método disponible en `ClaimsPrincipalExtensions`
+	- Ejemplos de uso práctico en controladores
+	- Patrón completo de uso en `ReservationsController`
+	- Consideraciones de seguridad y auditoría
+	- Best practices para integración con CorrelationIdMiddleware
+
+
+## Prompt 10: Ejecución Fase 3
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 3  
+**Objetivo:** Ejecutar Fase 3.1 - Crear controlador `SeatAvailabilityController`
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vvamos con fase 3.1 del plan de desarrollo. leelo todo y despues aplica cambios. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado: interfaz caso de uso + implementación + controlador REST.
+
+
+ ## Prompt 11: Ejecución Fase 3
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 3  
+**Objetivo:** Ejecutar Fase 3.2 - Crear controlador `ReservationsController`
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 3.2 del plan de desarrollo. leelo todo y despues aplica resumen de cambios hechos en el plan. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado: controlador para crear y consultar reservas + interfaces casos de uso
+
+
+  ## Prompt 12: Ejecución Fase 3
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 3  
+**Objetivo:** Ejecutar Fase 3.3 - Configurar Rutas, Atributos Globales y Validación de Modelos
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 3.3 del plan de desarrollo. leelo todo y despues aplica resumen de cambios hechos en el plan. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado: etiquetas (atributos) en controladores, validación de datos, respuestas de error estándar
+
+
+
+## Prompt 13: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** Reorganizar plan de desarrollo de fase 4. Fases 4.1 y 4.2 estaban casi completadas y las siguientes fases también. Revisar faltantes
+
+### Contenido del Prompt Original:
+ 
+ ```
+ quiero que elimines los puntos 4.3 y 4.4 del plan de desarrollo adjunto y reformules un nuevo 4.3 con algunos detalles que faltan.
+- crear ExceptionHandlingMiddleware.cs y registrar en program y corregir el orden de middleware
+- arreglar el problema de patron:
+El plan habla de método `AddApplicationServices()` pero el código actual:
+-  No llama a `Availability.Application.DependencyInjection.AddApplication()`
+-  Registra los servicios manualmente en Program.cs (líneas 47-50)
+ La clase `DependencyInjection` está preparada pero no se usa: Usar el método DependencyInjection existente 
+- revisar DateTime en GetReservationStatusResponse: Verificar que el controlador mapee los valores reales desde `RequestStatusDto` del UseCase, no use `DateTime.UtcNow`.
+
+ ```
+ ### Resultado Entregado: nuevo plan de desarrollo para fase 4. 
+
+
+## Prompt 14: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** Ejecutar Fase 4.3.1, 4.3.2 - Creación ExceptionHandlingMiddleware, registrar nuevo middleware en orden correcto
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 4.3.1 y 4.3.2 del plan de desarrollo. leelo todo y despues aplica resumen de cambios hechos en el plan. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado: El middleware está listo para capturar y manejar excepciones globales en la API
+
+
+ ## Prompt 15: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** Ejecutar Fase 4.3.3, 4.3.4 - inyección de dependencias por interfaz + campos de auditoría en RequestStatus
+
+### Contenido del Prompt Original:
+ 
+ ```
+ vamos con fase 4.3.3 y 4.3.4 del plan de desarrollo. leelo todo y despues aplica resumen de cambios hechos en el plan. para validar cambios compila la aplicacion
+
+ ```
+ ### Resultado Entregado: refactors solucionados. Refactorizar inyección de dependencias (Patrón DependencyInjection), verificar mapeo de DateTime en GetReservationStatusResponse
+
+
+  ## Prompt 16: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** code review de solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+quiero que hagas un code review exhaustivo de la rama feat/availability-lu, teniendo como contexto los documentos que te adjunto: plan de desarrollo y 
+consigna del tp.
+
+ ```
+ ### Resultado Entregado: code review 
+
+
+   ## Prompt 17: Ejecución Fase 4
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante desarrollo Fase 4  
+**Objetivo:** code review de solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+yo solo me encargo de la capa api de availability. te paso mis tareas: Capa de presentación (API), validación del JWT del usuario y logs de auditoría (3f). 
+solo me importa que se cumpla eso. entonces lo que corresponde a mi desarrollo y lo que reportarste, deberia revisar 
+Problema 1: Conversión int ↔ Guid es MOCK/TEMPORAL (CRÍTICO) 
+Problema 2: GetSeatsAvailabilityUseCase TAMBIÉN hace mapeo temporal 
+Problema 3: Manejo incompleto de UpdatedAt en ReservationRequest quiero que me hagas un plan de desarrollo para esos cambios
+
+ ```
+ ### Resultado Entregado: code review 
+
+
+## Prompt 18: Code review
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante review de cambios
+**Objetivo:** code review de solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+decidimos que la API reciba Guid para eventId, seatId y cualquier otro ID con el que interactue y lo pase tal cual a la capa de aplicación.
+De esta forma evitaremos conversiones y validaciones de int (borra las validaciones de int). 
+Solo se valida que venga un Guid con formato válido con lo siguiente: {eventId:guid} en la ruta y Guid? + [Required] en el request 
+Efectuar los cambios.
+Devolver mapa completo en GetSeatsResponse.cs.
+En Availability.Api/appsettings.json cambiar "Audience": "availability", sino no coincide con el aud=availability que emite el realm de keycloak
+
+ ```
+ ### Resultado Entregado: Correcciones hechas.  
+
+
+ ## Prompt 19: subir servicio a docker
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante review de cambios
+
+### Contenido del Prompt Original:
+ 
+ ```
+debo subir mi servicio abailability.api a docker-compose. ejecuta cambios necesarios para extraer los valores con fallback y luego usar las variables extraidas.
+
+ ```
+ ### Resultado Entregado:
+	•	Si existe appsettings.json → lo usa (desarrollo local)
+	•	Si no existe pero hay variables de entorno → las usa (Docker)
+
+
+ ## Prompt 20: code review changes
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante review de cambios
+
+### Contenido del Prompt Original:
+ 
+ ```
+hay un wrapper (GetSeatsAvailabilityUseCase) que solo llama a GetSeatMapUseCase, sin lógica adicional. eliminar el wrapper completamente
+[Required] sobre Guid no nullable no funciona bien. si no viene, queda Guid.Empty -> corregir
+
+ ```
+ ### Resultado Entregado:
+•	El controller (SeatAvailabilityController) ahora inyecta directamente IGetSeatMapUseCase
+•	GetSeatMapUseCase implementa IGetSeatMapUseCase (interfaz)
+• El [Required] ahora funciona correctamente: valida que no sea null.
+
+
+ ## Prompt 21: integración con abailability.infrastructure
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante review de cambios
+
+### Contenido del Prompt Original:
+ 
+ ```
+se solicita integración con Availability.Infrastructure. Se debe:
+1.	Agregar referencia a Microsoft.EntityFrameworkCore.Design en .csproj
+2.	Registrar Infrastructure en Program.cs
+3.	Aplicar migraciones al iniciar la app
+
+ ```
+ ### Resultado Entregado:
+	integración con infraestructura completada. Se agregó referencia a EF Core Design, se registró Availability.Infrastructure en Program.cs y se implementó la aplicación de migraciones al iniciar la app.
+
+
+## Prompt 22: agregar nuevos endpoints útiles
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante pruebas de la solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+crear nuevo endpoint para obtener eventos: GET api/events
+	1.	Crear interfaz IGetEventsUseCase (falta abstracción)
+	2.	Registrar la dependencia con interfaz en DependencyInjection.cs
+	3.	Agregar endpoint GET /api/events en SeatAvailabilityController
+		•	Llamar al caso de uso
+		•	Manejar errores (timeout, excepciones)
+
+ ```
+ ### Resultado Entregado:
+	nuevo endpoint get api/events
+
+
+## Prompt 23: agregar nuevos endpoints útiles
+
+**Solicitado por:** Luciana Tarzia  
+**Fecha:** Durante pruebas de la solución
+
+### Contenido del Prompt Original:
+ 
+ ```
+crear nuevo endpoint para obtener reservas: GET api/reservations
+	1.	Crear interfaz IGetUserRequestsUseCase (falta abstracción)
+	2.	Registrar la dependencia con interfaz en DependencyInjection.cs
+	3.	Agregar endpoint GET /api/reservations en ReservationsController
+		•	Extraer userId del JWT (claim "sub")
+		•	Llamar al caso de uso
+		•	Manejar errores (timeout, excepciones)
+		•	Devolver UserRequestSummaryDto[] ordenado por fecha descendente
+	4.	Documentación: XML comments explicando que devuelve el historial del usuario autenticado
+
+ ```
+ ### Resultado Entregado:
+	nuevo endpoint get api/reservations
