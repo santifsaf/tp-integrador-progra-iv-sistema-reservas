@@ -84,7 +84,10 @@ services:
       Authentication__Authority: http://localhost:8081/realms/seat-reservation
       Authentication__MetadataAddress: http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration
       Authentication__RequireHttpsMetadata: "false"
-      Payment__Address: ${BOOKING_PAYMENT_ADDRESS:-http://host.docker.internal:5300}
+      # Payment corre en el compose como payment-api. Si se ejecuta Payment con
+      # dotnet run en el host, override BOOKING_PAYMENT_ADDRESS con
+      # http://host.docker.internal:5300.
+      Payment__Address: ${BOOKING_PAYMENT_ADDRESS:-http://payment-api:8080}
       Payment__TokenEndpoint: http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token
       Payment__ClientSecret: ${BOOKING_CLIENT_SECRET}
       # Connection string de Azure Service Bus: va SOLO en infra/.env (nunca en el repo).
@@ -99,13 +102,15 @@ services:
       # Un puerto del host por réplica: 5200 y 5201.
       - "${BOOKING_API_PORTS:-5200-5201}:8080"
     extra_hosts:
-      # Permite llegar a Payment corriendo en el host (dotnet run) mientras no esté en el compose.
+      # Permite usar un Payment local (dotnet run) si se override BOOKING_PAYMENT_ADDRESS.
       - "host.docker.internal:host-gateway"
     depends_on:
       booking-db:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+      payment-api:
+        condition: service_started
 
   payment-db:
     image: postgres:17
@@ -123,6 +128,30 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  payment-api:
+    build:
+      # Contexto en la raíz del repo: Payment compila /contracts/proto/payment.proto.
+      context: ..
+      dockerfile: src/Payment/Payment.Grpc/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Payment: Host=payment-db;Port=5432;Database=${PAYMENT_DB_NAME:-payment};Username=${PAYMENT_DB_USER:-payment};Password=${PAYMENT_DB_PASSWORD:-payment}
+      Database__MigrateOnStartup: "true"
+      # El issuer de los tokens es localhost:8081 (KC_HOSTNAME), así que Authority
+      # conserva la URL pública. Dentro de Docker la metadata se pide por keycloak.
+      Keycloak__Authority: http://localhost:8081/realms/seat-reservation
+      Keycloak__MetadataAddress: http://keycloak:8081/realms/seat-reservation/.well-known/openid-configuration
+      Keycloak__RequireHttpsMetadata: "false"
+      Keycloak__Audience: payment
+    ports:
+      # El host usa 5300; dentro de la red de Docker Payment escucha en 8080.
+      - "${PAYMENT_API_PORT:-5300}:8080"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
 
 volumes:
   booking-db-data:
