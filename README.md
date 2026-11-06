@@ -19,7 +19,9 @@ Comunicación entre servicios:
 - Cada llamada entre servicios usa un token de Keycloak obtenido con _client credentials_.
 - Cada microservicio tiene su propia base **PostgreSQL**; ningún servicio lee la base de otro.
 
-> _Pendiente: diagrama general en `/docs`._
+Los diagramas generales de servicios y datos, autenticación e integración propuesta
+de Notifications, junto con la explicación de consistencia eventual e idempotencia,
+se encuentran en [Arquitectura general](docs/Arquitectura_General.md).
 
 ## Estructura del repositorio
 
