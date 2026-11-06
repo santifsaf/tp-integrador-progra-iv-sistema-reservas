@@ -148,7 +148,7 @@ curl -s http://localhost:8081/realms/seat-reservation/protocol/openid-connect/to
 | `GET /api/events`                   | No  | Lista los eventos ordenados por fecha                   | `200`                             |
 | `GET /api/events/{eventId}/seats`   | No  | Devuelve los asientos del evento con su estado          | `200`, `404`, `503`               |
 | `POST /api/reservations`            | Sí  | Crea y publica una solicitud                            | `202`, `400`, `401`, `404`, `503` |
-| `GET /api/reservations`             | Sí  | Devuelve el historial del usuario                       | `200`, `401`                      |
+| `GET /api/reservations`             | Sí  | Devuelve el historial del usuario                       | `200`, `401`, `503`               |
 | `GET /api/reservations/{requestId}` | Sí  | Devuelve el estado de una solicitud propia              | `200`, `401`, `403`, `404`, `503` |
 
 El usuario se identifica con el claim `sub` del token, que debe ser un GUID. El token del usuario tiene que traer `aud=availability`.
@@ -237,13 +237,13 @@ Los endpoints de `/api/reservations` usan siempre el mismo conjunto de estados:
 | `REJECTED`  | Reserva rechazada (asiento ocupado o pago fallido) | Booking         |
 | `EXPIRED`   | La retención venció sin confirmarse                | Booking         |
 
-Internamente, Availability guarda `Received`, `Published` o `PublishFailed` (`RequestStatus`). Esos valores no salen por la API: la traducción está en `Availability.Application/Common/RequestStatusNames.cs`.
+Internamente, Availability guarda `Received`, `Published` o `PublishFailed` (`RequestStatus`). Esos valores no salen por la API: la traducción está en `Availability.Application/Common/RequestStatusResolver.cs`.
 
 **Qué devuelve cada endpoint**
 
 - `POST /api/reservations`: `PENDING` (`202`). Si la publicación en Service Bus falla, responde `503` y la solicitud queda `FAILED`.
 - `GET /api/reservations/{requestId}`: el estado completo, más `description`, que puede ser `null`. Para `REJECTED`, la `description` explica el motivo (por ejemplo, `"El asiento está ocupado."`). Salvo que la publicación haya fallado, siempre se consulta primero a Booking, así que el estado se actualiza solo cuando Booking procesa el mensaje; si no se puede consultar a Booking, responde `503`. `updatedAt` hoy siempre coincide con `createdAt`, porque Availability no actualiza esa columna al cambiar el estado.
-- `GET /api/reservations`: historial del usuario, solo con el estado local (`PENDING` o `FAILED`). No consulta a Booking; para el estado final hay que usar el endpoint anterior.
+- `GET /api/reservations`: historial del usuario, con el mismo estado que el endpoint anterior pero sin `description`. Hace una consulta a Booking por cada solicitud cuya publicación no haya fallado; si alguna de esas consultas no se puede completar, responde `503`.
 
 **Solicitudes que no llegaron a publicarse**
 
@@ -281,13 +281,12 @@ Availability no reserva asientos: la decisión final la toma Booking, de forma a
 - **El mapa de asientos es una foto del momento.** Un asiento `AVAILABLE` puede ocuparse antes de que llegue la solicitud.
 - **Se pueden crear solicitudes repetidas.** Dos `POST` por el mismo asiento generan dos `requestId` distintos, incluso del mismo usuario, y Booking resuelve cada una.
 - **Al principio, el estado puede ser `PENDING`.** Booking responde `404` hasta procesar el mensaje, y mientras tanto la API devuelve `PENDING`.
-- **El historial no refleja el resultado final.** Availability no guarda lo que decide Booking, así que `GET /api/reservations` sigue mostrando `PENDING` aunque la reserva ya esté confirmada.
 
 ### Cuando falta un componente
 
 | Componente caído | Efecto en la API, con el proceso ya corriendo                                                                                                                      | Al arrancar                                        |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
-| Booking          | `seats` y `GET /api/reservations/{requestId}` responden `503`, salvo que la publicación de esa solicitud haya fallado. El `POST` y los eventos siguen funcionando. | Arranca igual                                      |
+| Booking          | `seats`, `GET /api/reservations` y `GET /api/reservations/{requestId}` responden `503`, salvo que no haga falta consultar a Booking porque la publicación falló (o el historial está vacío). El `POST` y los eventos siguen funcionando. | Arranca igual                                      |
 | Service Bus      | El `POST` responde `503` y la solicitud queda `FAILED`. El resto sigue funcionando.                                                                                | Arranca igual si la connection string está cargada |
 | PostgreSQL       | Los endpoints que usan la base responden `500`. `/health` sigue en `200`, porque no revisa dependencias.                                                           | No arranca: aplica las migraciones al iniciar      |
 | Keycloak         | Los endpoints protegidos responden `401`; `seats` responde `500`, porque no se puede pedir el token para Booking. `GET /api/events` sigue funcionando.             | Arranca igual                                      |
