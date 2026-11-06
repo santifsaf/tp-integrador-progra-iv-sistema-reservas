@@ -43,6 +43,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Booking.Api.Tests", "src\Bo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Booking.Data.Tests", "src\Booking\Booking.Data.Tests\Booking.Data.Tests.csproj", "{D1894076-D8BC-4F98-8D08-70EB545FAEBE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Payment.Tests", "src\Payment\Payment.Tests\Payment.Tests.csproj", "{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -233,6 +235,18 @@ Global
 		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|x64.Build.0 = Release|Any CPU
 		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|x86.ActiveCfg = Release|Any CPU
 		{D1894076-D8BC-4F98-8D08-70EB545FAEBE}.Release|x86.Build.0 = Release|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Debug|x64.Build.0 = Debug|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Debug|x86.Build.0 = Debug|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Release|x64.ActiveCfg = Release|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Release|x64.Build.0 = Release|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Release|x86.ActiveCfg = Release|Any CPU
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -257,5 +271,6 @@ Global
 		{EAB9E010-0897-4CA8-963A-E46320BFED6A} = {0D93AE7C-F497-2789-51B0-0BCB8A028FCE}
 		{5CC80AA7-B83B-4C95-A203-98EE2DACCB91} = {0D93AE7C-F497-2789-51B0-0BCB8A028FCE}
 		{D1894076-D8BC-4F98-8D08-70EB545FAEBE} = {0D93AE7C-F497-2789-51B0-0BCB8A028FCE}
+		{6ADA0463-22B8-4CAB-9582-11BA1CE2AE4D} = {FE9050FB-983E-C37B-EEA3-5C8ABB4CBAF9}
 	EndGlobalSection
 EndGlobal
