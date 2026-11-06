@@ -36,7 +36,6 @@ Keycloak no usa base externa: guarda todo dentro del contenedor. Al recrearlo ar
 el realm, así que los usuarios que entraron con GitHub se pierden. Para aplicar cambios del JSON:
 `docker compose -f infra/docker-compose.yml up -d --force-recreate keycloak`.
 
-
 ## Postgres de Booking
 
 Cada microservicio tiene su propia base PostgreSQL en su propio contenedor. El de Booking es el servicio `booking-db`:
@@ -89,82 +88,230 @@ depends_on:
 
 ## Availability
 
-La API (`availability-api`) y su base (`availability-db`) ya están en el compose:
+Es el punto de entrada del usuario: muestra eventos y asientos, y registra las solicitudes de reserva. No decide si un asiento se reserva: publica la solicitud y Booking resuelve.
 
-```bash
-docker compose -f infra/docker-compose.yml up -d --build availability-api
+### Arquitectura
+
+Las flechas sólidas son dependencias o llamadas; las punteadas, implementaciones y registro por inyección de dependencias.
+
+```mermaid
+flowchart TB
+    client(["Cliente / Swagger UI"])
+
+    subgraph availability["Availability"]
+        api["<b>Api</b><br/>Controllers, middleware,<br/>validación de JWT, Swagger"]
+        application["<b>Application</b><br/>Casos de uso e interfaces"]
+        domain["<b>Domain</b><br/>Entidades y RequestStatus"]
+        infrastructure["<b>Infrastructure</b><br/>Repositorios, publisher,<br/>cliente de Booking y de Keycloak"]
+
+        api --> application
+        application --> domain
+        infrastructure --> domain
+        infrastructure -. implementa interfaces .-> application
+        api -. registra por DI .-> infrastructure
+    end
+
+    db[("PostgreSQL<br/>availability")]
+    bus[/"Azure Service Bus<br/>grupo5-booking-topic"/]
+    booking["Booking"]
+    keycloak["Keycloak"]
+
+    client -->|"HTTP con JWT"| api
+    client -->|"login"| keycloak
+    api -->|"lee claves para validar JWT"| keycloak
+    infrastructure -->|"EF Core"| db
+    infrastructure -->|"ReservationRequestedMessage"| bus
+    infrastructure -->|"HTTP: ocupados y estado"| booking
+    infrastructure -->|"client credentials"| keycloak
+    bus -->|"suscripción booking"| booking
 ```
 
-`availability-api` espera a que `availability-db` y `keycloak` estén healthy, así que el comando levanta los tres.
+| Proyecto         | Responsabilidad                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Domain`         | Entidades `Event`, `Seat` y `ReservationRequest`, y el enum `RequestStatus`. No depende de ningún otro proyecto.                                            |
+| `Application`    | Casos de uso, interfaces que implementa Infrastructure (`IBookingClient`, `IReservationPublisher`, repositorios) y `Result`/`AppError`.                     |
+| `Infrastructure` | EF Core con PostgreSQL y migraciones, publisher de Service Bus, cliente HTTP de Booking y obtención del token de Keycloak.                                  |
+| `Api`            | Controllers, validación del JWT, middlewares de errores y de correlation ID, logs con Serilog y Swagger. Referencia a Infrastructure solo para registrarla. |
 
-- **API:** http://localhost:5100 (health en `/health`); dentro de la red de Docker, `availability-api:8080`.
-- **Migraciones y seed:** se aplican solos al iniciar la API; no hace falta `dotnet ef database update`.
-- **Base:** puerto del host `5433` (`AVAILABILITY_DB_PORT`); entre contenedores `availability-db:5432`.
-  Usuario, contraseña y base valen `availability` (`AVAILABILITY_DB_*`). Son valores de desarrollo local,
-  no secretos. Los datos viven en el volumen `availability-db-data`.
+### Endpoints
 
-### Configuración
-
-ASP.NET Core arma la configuración en capas; cada una pisa a la anterior:
-
-1. `appsettings.json`: valores comunes y direcciones **dentro de Docker** (`keycloak:8081`, `booking:8080`).
-2. `appsettings.Development.json`: solo con `dotnet run`; pisa las direcciones con `localhost`.
-3. user-secrets: solo en Development; secretos de cada integrante, fuera del repo.
-4. Variables de entorno (`Seccion__Clave`): en Docker las define `docker-compose.yml` con los valores de `infra/.env`.
-
-La API **no lee `infra/.env`**: ese archivo solo lo usa `docker compose` para reemplazar los `${VAR}`.
-
-| Clave                              | Docker                                         | Local (`dotnet run`)                                   |
-| ---------------------------------- | ---------------------------------------------- | ------------------------------------------------------ |
-| `ConnectionStrings:AvailabilityDb` | compose, con `AVAILABILITY_DB_*`               | `appsettings.Development.json` (`localhost:5433`)      |
-| `ServiceBus:ConnectionString`      | compose, con `MSG_BROKER_CONNECTION_STRING`    | **user-secrets**                                       |
-| `ServiceBus:TopicName`             | `appsettings.json` (`grupo5-booking-topic`)    | `appsettings.json`                                     |
-| `Keycloak:ClientSecret`            | compose, con `AVAILABILITY_CLIENT_SECRET`      | `appsettings.Development.json` (`availability-secret`) |
-| `Keycloak:TokenEndpoint`           | `appsettings.json` (`keycloak:8081`)           | `appsettings.Development.json` (`localhost:8081`)      |
-| `Booking:BaseUrl`                  | `appsettings.json` (`http://booking:8080/`)    | `appsettings.Development.json` (`http://localhost:5200/`) |
-| `JwtSettings:Authority`            | `appsettings.json` (`keycloak:8081`)           | `appsettings.Development.json` (`localhost:8081`)      |
-| `JwtSettings:Audience`             | `appsettings.json` (`availability`)            | `appsettings.json`                                     |
-
-Si falta la base, `ServiceBus`, `Booking` o `Keycloak`, la API no arranca y el log indica qué clave falta.
-
-### Secretos
-
-- **Connection string de Service Bus:** la entrega la cátedra y nunca va en un `appsettings`.
-  En Docker sale de `MSG_BROKER_CONNECTION_STRING` en `infra/.env`. En local se guarda en user-secrets,
-  una vez por máquina (mismo valor que en `.env`):
-
-  ```bash
-  dotnet user-secrets set "ServiceBus:ConnectionString" "<pedirla al grupo>" --project src/Availability/Availability.Api
-  ```
-
-  El repo solo guarda el `UserSecretsId` del `.csproj`; el valor queda en
-  `~/.microsoft/usersecrets/<id>/secrets.json` (Windows: `%APPDATA%\Microsoft\UserSecrets\<id>\secrets.json`).
-- **Secret del client `availability`:** Keycloak lo importa de `AVAILABILITY_CLIENT_SECRET` y en Docker la
-  API usa la misma variable. En local se usa `availability-secret` (el de `.env.example`); si se cambia en
-  `.env`, sobrescribirlo con `dotnet user-secrets set "Keycloak:ClientSecret" "<valor>" --project src/Availability/Availability.Api`.
-
-### Correr la API fuera de Docker
+**Swagger UI:** http://localhost:5100/swagger, disponible fuera de `Production`. Para probar los endpoints protegidos, pedir un token y pegarlo en **Authorize**, sin el prefijo `Bearer`:
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d --wait availability-db keycloak
-dotnet user-secrets set "ServiceBus:ConnectionString" "<pedirla al grupo>" --project src/Availability/Availability.Api
-dotnet run --project src/Availability/Availability.Api
+curl -s http://localhost:8081/realms/seat-reservation/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=web -d username=tester -d password=tester
 ```
 
-Queda en http://localhost:5100 (perfil Development de `launchSettings.json`).
+| Método y ruta                       | JWT | Qué hace                                                | Respuestas                        |
+| ----------------------------------- | --- | ------------------------------------------------------- | --------------------------------- |
+| `GET /health`                       | No  | Indica que el proceso está vivo; no revisa dependencias | `200`                             |
+| `GET /api/events`                   | No  | Lista los eventos ordenados por fecha                   | `200`                             |
+| `GET /api/events/{eventId}/seats`   | No  | Devuelve los asientos del evento con su estado          | `200`, `404`, `503`               |
+| `POST /api/reservations`            | Sí  | Crea y publica una solicitud                            | `202`, `400`, `401`, `404`, `503` |
+| `GET /api/reservations`             | Sí  | Devuelve el historial del usuario                       | `200`, `401`                      |
+| `GET /api/reservations/{requestId}` | Sí  | Devuelve el estado de una solicitud propia              | `200`, `401`, `403`, `404`, `503` |
 
-### Migraciones y tests
+El usuario se identifica con el claim `sub` del token, que debe ser un GUID. El token del usuario tiene que traer `aud=availability`.
+
+**Crear una solicitud**
+
+```http
+POST /api/reservations
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "eventId": "11111111-1111-1111-1111-111111111111",
+  "seatId": "11111111-1111-1111-1111-111111111101"
+}
+```
+
+Responde `202`, con la URL de seguimiento en el header `Location`:
+
+```json
+{
+	"requestId": "a4f1b8e0-8902-4b21-9a2f-1c3d5e7f9b0a",
+	"status": "PENDING",
+	"message": "Solicitud de reserva aceptada. Use el requestId para seguimiento."
+}
+```
+
+**Consultar el mapa de asientos**
+
+`GET /api/events/11111111-1111-1111-1111-111111111111/seats` responde `200`. El estado de cada asiento es `AVAILABLE` u `OCCUPIED`:
+
+```json
+{
+	"eventId": "11111111-1111-1111-1111-111111111111",
+	"eventName": "Festival de musica",
+	"totalSeats": 4,
+	"availableSeats": 3,
+	"seats": [
+		{
+			"seatId": "11111111-1111-1111-1111-111111111101",
+			"label": "A1",
+			"status": "OCCUPIED"
+		},
+		{
+			"seatId": "11111111-1111-1111-1111-111111111102",
+			"label": "A2",
+			"status": "AVAILABLE"
+		}
+	]
+}
+```
+
+_El ejemplo muestra solo 2 de los 4 asientos._
+
+**Errores**
+
+Los errores que genera la API usan este formato, y `correlationId` permite buscar la solicitud en los logs:
+
+```json
+{
+	"code": "EVENT_NOT_FOUND",
+	"message": "El evento especificado no existe",
+	"correlationId": "26c37a22e00344d38865ca4dc4c6f38d",
+	"details": null
+}
+```
+
+Tres casos no lo usan, porque los resuelve ASP.NET Core antes de llegar al controller:
+
+- **Body inválido:** `400` con `ValidationProblemDetails`.
+- **Token ausente o inválido:** `401` con el cuerpo vacío.
+- **GUID inválido en la ruta:** `404` con el cuerpo vacío.
+
+Todas las respuestas incluyen el header `X-Correlation-ID`: se reutiliza el que manda el cliente o se genera uno nuevo. Un error inesperado, como una caída de la base, responde `500`.
+
+### Estados de una solicitud de reserva
+
+Los endpoints de `/api/reservations` usan siempre el mismo conjunto de estados:
+
+| Estado      | Significado                                        | Quién lo decide |
+| ----------- | -------------------------------------------------- | --------------- |
+| `PENDING`   | Solicitud registrada; Booking todavía no la tiene  | Availability    |
+| `FAILED`    | La solicitud nunca llegó a Booking                 | Availability    |
+| `HELD`      | Asiento retenido mientras se procesa el pago       | Booking         |
+| `CONFIRMED` | Pago aprobado, reserva confirmada                  | Booking         |
+| `REJECTED`  | Reserva rechazada (asiento ocupado o pago fallido) | Booking         |
+| `EXPIRED`   | La retención venció sin confirmarse                | Booking         |
+
+Internamente, Availability guarda `Received`, `Published` o `PublishFailed` (`RequestStatus`). Esos valores no salen por la API: la traducción está en `Availability.Application/Common/RequestStatusNames.cs`.
+
+**Qué devuelve cada endpoint**
+
+- `POST /api/reservations`: `PENDING` (`202`). Si la publicación en Service Bus falla, responde `503` y la solicitud queda `FAILED`.
+- `GET /api/reservations/{requestId}`: el estado completo, más `description`, que puede ser `null`. Para `REJECTED`, la `description` explica el motivo (por ejemplo, `"El asiento está ocupado."`). Salvo que la publicación haya fallado, siempre se consulta primero a Booking, así que el estado se actualiza solo cuando Booking procesa el mensaje; si no se puede consultar a Booking, responde `503`. `updatedAt` hoy siempre coincide con `createdAt`, porque Availability no actualiza esa columna al cambiar el estado.
+- `GET /api/reservations`: historial del usuario, solo con el estado local (`PENDING` o `FAILED`). No consulta a Booking; para el estado final hay que usar el endpoint anterior.
+
+**Solicitudes que no llegaron a publicarse**
+
+El `POST` guarda la solicitud como `Received`, la publica y después la marca `Published` (o `PublishFailed`). Si el proceso se cae entre esos pasos, queda en `Received` y hay dos casos:
+
+- **El mensaje llegó a salir:** Booking lo procesa y el `GET` por `requestId` muestra su estado.
+- **El mensaje no salió:** Booking nunca la va a tener. Si Booking responde `404` y pasaron más de 5 minutos desde la creación, el `GET` por `requestId` devuelve `FAILED` con `"La solicitud no llegó a publicarse"`.
+
+La regla se aplica al leer: no modifica la base ni reenvía la solicitud, porque el usuario ya recibió un error en el `POST` y reservarle el asiento después lo confundiría. Para reintentar, se crea una solicitud nueva.
+
+### Mensaje publicado en Azure Service Bus
+
+Cada solicitud publica un `ReservationRequestedMessage` ([`contracts/events`](contracts/events/ReservationRequestedMessage.cs)) en el topic `grupo5-booking-topic`. Booking lo consume con la suscripción `booking`.
+
+```json
+{
+	"requestId": "a4f1b8e0-8902-4b21-9a2f-1c3d5e7f9b0a",
+	"eventId": "11111111-1111-1111-1111-111111111111",
+	"seatId": "11111111-1111-1111-1111-111111111101",
+	"userId": "7c1e4d2a-5b3f-4a6e-9d8c-0f1a2b3c4d5e",
+	"requestedAt": "2026-11-05T23:45:25.161561+00:00",
+	"amountCents": 15000,
+	"currency": "ARS"
+}
+```
+
+- `MessageId` y `CorrelationId` del mensaje son el `requestId`.
+- `amountCents` y `currency` salen del evento guardado en Availability.
+
+### Dónde el sistema es eventualmente consistente
+
+Availability no reserva asientos: la decisión final la toma Booking, de forma asincrónica. Por eso:
+
+- **El `202` no garantiza el asiento.** El `POST` solo comprueba que el asiento exista en ese evento, no que esté libre. Si está ocupado, la API igual responde `202` y Booking la rechaza después (`REJECTED`).
+- **El mapa de asientos es una foto del momento.** Un asiento `AVAILABLE` puede ocuparse antes de que llegue la solicitud.
+- **Se pueden crear solicitudes repetidas.** Dos `POST` por el mismo asiento generan dos `requestId` distintos, incluso del mismo usuario, y Booking resuelve cada una.
+- **Al principio, el estado puede ser `PENDING`.** Booking responde `404` hasta procesar el mensaje, y mientras tanto la API devuelve `PENDING`.
+- **El historial no refleja el resultado final.** Availability no guarda lo que decide Booking, así que `GET /api/reservations` sigue mostrando `PENDING` aunque la reserva ya esté confirmada.
+
+### Cuando falta un componente
+
+| Componente caído | Efecto en la API, con el proceso ya corriendo                                                                                                                      | Al arrancar                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| Booking          | `seats` y `GET /api/reservations/{requestId}` responden `503`, salvo que la publicación de esa solicitud haya fallado. El `POST` y los eventos siguen funcionando. | Arranca igual                                      |
+| Service Bus      | El `POST` responde `503` y la solicitud queda `FAILED`. El resto sigue funcionando.                                                                                | Arranca igual si la connection string está cargada |
+| PostgreSQL       | Los endpoints que usan la base responden `500`. `/health` sigue en `200`, porque no revisa dependencias.                                                           | No arranca: aplica las migraciones al iniciar      |
+| Keycloak         | Los endpoints protegidos responden `401`; `seats` responde `500`, porque no se puede pedir el token para Booking. `GET /api/events` sigue funcionando.             | Arranca igual                                      |
+
+Las llamadas HTTP a Booking y Keycloak usan el handler de resiliencia estándar de .NET, con reintentos, y el cliente de Service Bus usa su política de reintentos por defecto. Por eso, estas respuestas pueden demorar unos segundos.
+
+### Configuración y datos de prueba
+
+**Configuración:** las claves necesarias, los secretos y cómo levantar la API dentro y fuera de Docker están en [`infra/README.md`](infra/README.md#availability). Si falta alguna clave obligatoria, la API no arranca y el log indica cuál es.
+
+**Datos de prueba:** las migraciones cargan estos eventos, cada uno con los asientos `A1`, `A2`, `B1` y `B2`:
+
+| Evento                      | `eventId`                              | Fecha (UTC)        | Precio     | `seatId` de `A1`, `A2`, `B1` y `B2`                |
+| --------------------------- | -------------------------------------- | ------------------ | ---------- | -------------------------------------------------- |
+| `Festival de musica`        | `11111111-1111-1111-1111-111111111111` | `2026-12-01 20:00` | 150,00 ARS | `11111111-1111-1111-1111-1111111111` + `01` a `04` |
+| `Conferencia de tecnologia` | `22222222-2222-2222-2222-222222222222` | `2027-01-15 18:30` | 200,00 ARS | `22222222-2222-2222-2222-2222222222` + `01` a `04` |
+
+**Tests:** `Availability.Infrastructure.Tests` cubre los repositorios, el publisher y los clientes de Booking y Keycloak. Los tests de repositorios necesitan Docker. Application y Api no tienen tests automatizados.
 
 ```bash
-dotnet ef migrations add <Nombre> \
-  --project src/Availability/Availability.Infrastructure \
-  --startup-project src/Availability/Availability.Api \
-  --output-dir Persistence/Migrations
 dotnet test src/Availability/Availability.Infrastructure.Tests
 ```
 
-Los tests de repositorios levantan su propio PostgreSQL con Testcontainers: necesitan Docker, pero no
-`availability-db`.
+**Documentación de diseño:** las reglas de negocio y las decisiones técnicas están en [`Availability.Infrastructure/specs`](src/Availability/Availability.Infrastructure/specs).
 
 ## Postgres de Payment
 
