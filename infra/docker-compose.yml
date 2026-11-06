@@ -91,7 +91,14 @@ services:
     networks:
       - default
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      # La imagen no trae curl y su /bin/sh (dash) no soporta /dev/tcp: se consulta /health con bash.
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.1 200' <&3",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
