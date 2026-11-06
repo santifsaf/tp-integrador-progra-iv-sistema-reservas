@@ -4,7 +4,7 @@
 **Proyecto:** TP Final — Sistema de reserva de asientos (grupo 5)
 **Basado en:** `technical-spec.md`, `business-rules.md` y `product-brief.md` (2026-10-31)
 **Responsable:** Rebeca — capa Infrastructure
-**Última actualización:** 2026-11-03
+**Última actualización:** 2026-11-04
 
 ## Cómo leer este plan
 
@@ -84,12 +84,12 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 | **U-07** | **Resuelto (2026-11-03, verificado en la implementación compartida de Booking):** `200` devuelve `{ "status", "description" }`; `404` significa que Booking todavía no tiene una reserva para el `requestId`. Availability interpreta ese `404` como pendiente si la solicitud existe localmente. | Booking API | T4.7 |
 | **U-08** | **Resuelto (2026-11-03):** estandarizar el header saliente como `X-Correlation-ID`. Las consultas de reserva usan `requestId`; otras consultas propagan el ID HTTP. | Santi / Rebeca | T4.8 |
 | **U-09** | **Acordado e implementado (2026-11-04):** PostgreSQL 17 como `availability-db`, puerto host `5433` → contenedor `5432`, variables `AVAILABILITY_DB_NAME`, `AVAILABILITY_DB_USER`, `AVAILABILITY_DB_PASSWORD`, healthcheck `pg_isready` y dependencia saludable desde `availability-api`. | Felipe / Rebeca | T1.11, T2.4, T2.5 |
-| **U-10** | `Booking__BaseUrl=http://booking:8080/` en Docker y `http://localhost:5200/` en ejecución local. Falta cablearla en la configuración de la API, que mantiene Luciana. | Felipe / Santi | T4.5, T4.10 |
-| **U-11** | **Convención ** la API leerá `Keycloak__ClientSecret`, con valor `${AVAILABILITY_CLIENT_SECRET}` en Compose. Falta agregar ese mapeo cuando se incorpore el servicio de la API, responsabilidad de Luciana/Felipe. | Felipe | T4.4, T4.10 |
-| **U-12** | **Decisión confirmada (2026-11-03):** dentro de Compose, el token endpoint es `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; el `iss` permanece `http://localhost:8081/realms/seat-reservation`. Falta aplicar la configuración en la API. | Felipe | T4.3, T4.10 |
-| **U-13** | **Convención acordada (2026-11-03):** mantener Serilog y usar logs estructurados con `Service`, `Operation`, `Event`, `CorrelationId`; agregar duración, status HTTP y excepción cuando corresponda, sin registrar secretos ni payloads sensibles. La configuración de Serilog y el middleware de API requieren integración de Luciana; Infrastructure ya registra algunos eventos estructurados. | Felipe / Rebeca | T5.5, T5.7 |
-| **U-14** | **Decisión confirmada (2026-11-03):** usar `requestId` en operaciones de reserva y el ID del middleware HTTP en consultas sin `requestId`; propagarlo a Booking como `X-Correlation-ID`. El cliente de Infrastructure fija `requestId` en la consulta de estado y el handler propaga el ID HTTP para otras consultas. | Felipe / Feli / Luciana | T5.6 |
-| **U-15** | Proyecto Api con el paquete `Microsoft.EntityFrameworkCore.Design` y un `Program.cs` que llame a `AddInfrastructure` y `ApplyMigrationsAsync`; coordinar además la configuración y el servicio API en Compose con Felipe. | Luciana / Felipe | T1.10, T2.3, T2.5, integración de U-09/U-11 |
+| **U-10** | La convención está definida: `Booking__BaseUrl=http://booking:8080/` en Docker y `http://localhost:5200/` en local. Falta pasar `Booking__BaseUrl` a Availability; el Compose actual no incluye el servicio de Booking, por lo que T4.10 requiere que Booking esté disponible por separado o se incorpore al entorno. | Felipe / Santi | T4.5, T4.10 |
+| **U-11** | La convención está definida: Availability lee `Keycloak__ClientSecret`, alimentado por `${AVAILABILITY_CLIENT_SECRET}`. El servicio `availability-api` ya existe en Compose, pero todavía no tiene ese mapeo. | Felipe | T4.4, T4.10 |
+| **U-12** | **Decisión confirmada (2026-11-03):** dentro de Compose, el token endpoint es `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; el `iss` permanece `http://localhost:8081/realms/seat-reservation`. El servicio `availability-api` está integrado, pero aún falta configurar `Keycloak:TokenEndpoint` para el cliente de credenciales. | Felipe | T4.3, T4.10 |
+| **U-13** | **Convención acordada (2026-11-03):** mantener Serilog y logs estructurados con `Service`, `Operation`, `Event`, `CorrelationId`, duración, status HTTP y excepción cuando corresponda, sin secretos ni payloads sensibles. Serilog ya escribe a consola y archivo; el middleware HTTP registra correlación, método/ruta y status. Falta verificar/alinear el formato estructurado común y los datos de duración y excepción en el pipeline HTTP. | Felipe / Rebeca | T5.5, T5.7 |
+| **U-14** | **Resuelto e integrado (2026-11-04):** el middleware HTTP genera o acepta `X-Correlation-ID`; Infrastructure lo propaga a Booking en consultas sin `requestId` y usa el `requestId` en consultas de reserva. | Felipe / Feli / Luciana | T5.6 |
+| **U-15** | **Resuelto e integrado (2026-11-04):** Api.csproj incluye `Microsoft.EntityFrameworkCore.Design`, `Program.cs` registra `AddInfrastructure` y ejecuta `ApplyMigrationsAsync`, y `availability-api` está definido en Compose con dependencia saludable de PostgreSQL. | Luciana / Felipe | T1.10, T2.3, T2.5, integración de U-09 |
 | **U-16** | **Resuelto:** suite propia `Availability.Infrastructure.Tests` con xUnit; PostgreSQL real vía Testcontainers para repositorios, `HttpMessageHandler` falso para HTTP y doble de `ServiceBusSender`. | Grupo | T6.1 y todas las pruebas de F6 |
 | **U-17** | **Resuelto (2026-11-03):** usar los valores por defecto de `Microsoft.Extensions.Http.Resilience` para los clientes HTTP y del SDK de Service Bus para publicaciones; no definir valores personalizados. | Grupo | T5.1, T5.3, T5.4 |
 | **U-18** | **Resuelto (2026-11-03):** Service Bus usa solo los reintentos nativos del SDK; no agregar Polly ni una segunda política de reintentos al publisher. | Grupo | T5.2, T5.4 |
@@ -99,11 +99,9 @@ Cada desbloqueo es una respuesta o decisión que falta. La columna de tareas mue
 
 ### Qué conviene cerrar primero
 
-Ordenados por cuántas tareas destraban:
-
-1. **U-15 (Luciana):** destraba la migración inicial y el arranque.
-2. **U-16 (grupo):** definir framework y estrategia de pruebas para habilitar F6.
-3. **U-19/U-20 (grupo):** acordar ubicación de documentación y responsables del diagrama para cerrar F7.
+1. **T4.3–T4.5 (Felipe/Luciana):** completar los mapeos de Booking y Keycloak en `availability-api`.
+2. **T4.10 y T3.9:** disponer de Booking/Keycloak y autorización para las verificaciones contra los servicios reales.
+3. **U-19/U-20:** acordar ubicación de documentación y responsables del diagrama para cerrar F7.
 
 ---
 
@@ -161,7 +159,7 @@ Ordenados por cuántas tareas destraban:
 | **T2.1** | `DatabaseInitializer.ApplyMigrationsAsync` (equivalente asíncrono de `Database.Migrate()`). | F1 | **Implementada** | — |
 | **T2.2** | `AddInfrastructure(IServiceCollection, IConfiguration)`: opciones, `DbContext` con `ConnectionStrings:AvailabilityDb`, repositorios y `TimeProvider`. Los registros del publisher, el token y el cliente de Booking se suman en F3 y F4. | F1 | **Implementada** | — |
 | **T2.3** | Coordinar con Luciana que `Program.cs` llame a `AddInfrastructure(builder.Configuration)` y a `ApplyMigrationsAsync()`, y que Api.csproj incluya `Microsoft.EntityFrameworkCore.Design`. | T2.1, T2.2, U-15 | **Implementada e integrada (2026-11-04)** | — |
-| **T2.4** | Que Availability espere a que PostgreSQL esté listo: `depends_on` con `service_healthy` en el compose y reintentos de conexión en Npgsql. | U-09 | **Parcial:** Compose espera `availability-db` saludable; `EnableRetryOnFailure()` en Npgsql todavía no está configurado. | `EnableRetryOnFailure()` en las opciones de Npgsql (propuesta técnica de la spec §5.4) |
+| **T2.4** | Que Availability espere a que PostgreSQL esté listo: `depends_on` con `service_healthy` en el compose y reintentos de conexión en Npgsql. | U-09 | **Implementada (2026-11-04):** Compose espera `availability-db` saludable y Npgsql usa `EnableRetryOnFailure()` con sus valores predeterminados. | — |
 | **T2.5** | Verificar que la app migra y siembra la base al iniciar con `docker-compose up`. | T2.3, T2.4, U-09, U-15 | **Verificada (2026-11-04):** la API inicia saludable y aplica/encuentra aplicada la migración; PostgreSQL contiene dos eventos y ocho asientos. | — |
 
 **Se considera terminada cuando:** al iniciar la app con el compose, la base queda migrada y sembrada sin pasos manuales.
@@ -201,21 +199,14 @@ Ordenados por cuántas tareas destraban:
 |---|---|---|---|---|
 | **T4.1** | `KeycloakTokenProvider`: `client_credentials`, caché del token y renovación 30 segundos antes del vencimiento, con un semáforo para no pedir varios tokens a la vez. | F0 | **Implementada** | — |
 | **T4.2** | `BookingAuthHandler`: agrega `Authorization: Bearer` en cada llamada. | T4.1 | **Implementada** | — |
-<<<<<<< Updated upstream
-| **T4.3** | Configurar el token endpoint de Keycloak para Docker y desarrollo local, validando el issuer acordado. | U-12 | **Decisión resuelta; configuración de API pendiente con Luciana** | Docker: `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; local: `http://localhost:8081/realms/seat-reservation/protocol/openid-connect/token` |
-| **T4.4** | Fijar el nombre de la variable del secreto del client `availability` en el contenedor de Availability. | U-11 | **Convención resuelta; falta cablear al agregar la API al compose** | `Keycloak__ClientSecret: ${AVAILABILITY_CLIENT_SECRET}` |
-| **T4.5** | Fijar `Booking:BaseUrl`. | U-10 | **Decisión resuelta; configuración de API pendiente con Luciana** | Docker: `http://booking:8080/`; local: `http://localhost:5200/` |
-| **T4.6** | `BookingClient.GetOccupiedSeatIdsAsync`: `GET api/events/{eventId}/occupied-seats`, deserializa `[{ seatId, isOccupied }]` y devuelve los `seatId` con `isOccupied` en `true`; lista vacía con `200` significa "nada ocupado". Si Booking falla, lanza `ExternalServiceUnavailableException`. | T4.2 | **Implementada (2026-11-03)** | — |
-=======
 | **T4.3** | Configurar el token endpoint de Keycloak para Docker y desarrollo local, validando el issuer acordado. | U-12 | **Parcial:** endpoint e issuer acordados; falta mapear `Keycloak__TokenEndpoint` a `availability-api`. | Docker: `http://keycloak:8081/realms/seat-reservation/protocol/openid-connect/token`; local: `http://localhost:8081/realms/seat-reservation/protocol/openid-connect/token` |
 | **T4.4** | Fijar el nombre de la variable del secreto del client `availability` en el contenedor de Availability. | U-11 | **Parcial:** convención acordada; falta agregar `Keycloak__ClientSecret: ${AVAILABILITY_CLIENT_SECRET}` al entorno de `availability-api`. | `Keycloak__ClientSecret: ${AVAILABILITY_CLIENT_SECRET}` |
 | **T4.5** | Fijar `Booking:BaseUrl`. | U-10 | **Parcial:** direcciones acordadas; falta mapear `Booking__BaseUrl` en `availability-api` y tener Booking accesible en la dirección configurada. | Docker: `http://booking:8080/`; local: `http://localhost:5200/` |
-| **T4.6** | `BookingClient.GetOccupiedSeatIdsAsync`: `GET api/events/{eventId}/occupied-seats`, deserializa un array JSON de GUIDs ocupados y devuelve el conjunto; `[]` con `200` significa "nada ocupado". Si Booking falla, lanza `ExternalServiceUnavailableException`. | T4.2 | **Implementada (2026-11-04):** contrato de array de GUIDs | — |
->>>>>>> Stashed changes
+| **T4.6** | `BookingClient.GetOccupiedSeatIdsAsync`: `GET api/events/{eventId}/occupied-seats`, deserializa un array JSON de GUIDs ocupados y devuelve el conjunto; `[]` con `200` significa "nada ocupado". Si Booking falla, lanza `ExternalServiceUnavailableException`. | T4.2 | **Implementada (2026-11-04):** contrato de array de GUIDs asumido para Booking. | — |
 | **T4.7** | `BookingClient.GetStatusByRequestIdAsync`: `GET api/reservations/by-request/{requestId}`, deserializa `{ status, description }`, devuelve `null` ante `404` (solicitud todavía no disponible en Booking) y lanza `ExternalServiceUnavailableException` ante otros errores o respuestas inválidas. | T4.6, U-07 | **Implementada (2026-11-03)** | — |
 | **T4.8** | Enviar `X-Correlation-ID`: `requestId` en consultas de reserva y el ID HTTP en las consultas sin `requestId`. | T4.7, U-08 | **Implementada (2026-11-03):** el cliente fija el `requestId` para la consulta de estado y el handler propaga el ID HTTP para otras consultas | — |
 | **T4.9** | Registrar en `AddInfrastructure` el `KeycloakTokenProvider`, los handlers y el cliente HTTP de Booking. | T4.2, T4.6 | **Implementada (2026-11-03)** | — |
-| **T4.10** | Verificar contra Keycloak y Booking reales: el token se pide una sola vez mientras es válido y las dos consultas responden. | T4.3, T4.4, T4.5, T4.7 | **Pendiente de integrar y configurar la API en Compose (Luciana/Felipe) y de disponer de los servicios reales** | — |
+| **T4.10** | Verificar contra Keycloak y Booking reales: el token se pide una sola vez mientras es válido y las dos consultas responden usando el contrato acordado para ocupación. | T4.3, T4.4, T4.5, T4.7 | **Pendiente:** completar los mapeos de configuración y disponer de Booking/Keycloak accesibles para la prueba real. | — |
 | **T4.11** | Comentar las decisiones: caché del token, handler delegante, `404` como `null`, errores que se distinguen. | T4.7 | **Implementada (2026-11-03)** | — |
 
 **Se considera terminada cuando:** el cliente obtiene un token del client `availability`, lo cachea y consulta los dos endpoints de Booking (BR-22 a BR-30).
@@ -234,9 +225,9 @@ Ordenados por cuántas tareas destraban:
 | **T5.2** | Confirmar si el publisher usa los reintentos del SDK o Polly. | U-18 | **Resuelta (2026-11-03):** solo reintentos nativos de Azure Service Bus, sin Polly. | — |
 | **T5.3** | Agregar `AddStandardResilienceHandler()` al `BookingClient` y al `HttpClient` de Keycloak, **registrado antes** del handler de token para que cada reintento consulte el token vigente. | F4, T5.1 | **Implementada (2026-11-03)** | — |
 | **T5.4** | Configurar `ServiceBusRetryOptions` en el `ServiceBusClient`. | F3, T5.1, T5.2 | **Implementada (2026-11-03):** opciones del SDK explícitas, sin personalizar sus valores por defecto y sin Polly. | — |
-| **T5.5** | Aplicar la convención de logs acordada: Serilog estructurado con `Service`, `Operation`, `Event`, `CorrelationId`, duración, status HTTP y excepción según corresponda. | U-13 | **Parcial: publisher, repositorios, BookingClient y adquisición de token emiten eventos estructurados; falta configurar la salida y el middleware en API (Luciana)** | — |
-| **T5.6** | Propagar la correlación HTTP de consultas sin `requestId` a Booking con `X-Correlation-ID`; las consultas de reserva usan `requestId`. | U-14 | **Implementada en Infrastructure; requiere el middleware HTTP de API para consultas sin `requestId`** | — |
-| **T5.7** | Logs `Started`, `Completed` y `Failed` correlacionados en las operaciones de Infrastructure y en el pipeline HTTP; nunca registrar secretos, tokens ni connection strings. | F1, F3, F4 | **Parcial: Infrastructure registra eventos; falta el pipeline HTTP de API (Luciana)** | — |
+| **T5.5** | Aplicar la convención de logs acordada: Serilog estructurado con `Service`, `Operation`, `Event`, `CorrelationId`, duración, status HTTP y excepción según corresponda. | U-13 | **Parcial:** Serilog ya escribe a consola y archivo, y el middleware HTTP registra correlación, método/ruta y status; falta alinear todos esos eventos con la convención y enriquecerlos con duración y excepción cuando corresponda. | — |
+| **T5.6** | Propagar la correlación HTTP de consultas sin `requestId` a Booking con `X-Correlation-ID`; las consultas de reserva usan `requestId`. | U-14 | **Implementada (2026-11-04):** middleware HTTP presente y correlación propagada por Infrastructure. | — |
+| **T5.7** | Logs `Started`, `Completed` y `Failed` correlacionados en las operaciones de Infrastructure y en el pipeline HTTP; nunca registrar secretos, tokens ni connection strings. | F1, F3, F4 | **Parcial:** Infrastructure y el middleware HTTP registran eventos; falta completar la consistencia de campos y duración en el pipeline HTTP. | — |
 
 **Se considera terminada cuando:** hay reintentos y timeouts configurados en los dos clientes, y los logs de auditoría permiten seguir un `requestId` por Availability (BR-41).
 **Nota:** como los reintentos pueden duplicar un mensaje, la protección es el `MessageId` igual al `requestId` y la idempotencia de Booking por `requestId`.
@@ -257,11 +248,11 @@ Pruebas de `Availability.Infrastructure.Tests`:
 
 | ID | Prueba | Regla | Depende de | Estado |
 |---|---|---|---|---|
-| **T6.2** | `SaveAsync` con `Id` repetido falla | BR-08 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
-| **T6.3** | `UpdateStatusAsync` cambia el estado, lanza `KeyNotFoundException` si el Id no existe y los tres valores del enum se guardan y se leen | BR-10, BR-11 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
-| **T6.4** | `ExistsAsync` es `false` si el asiento no pertenece al evento | BR-01 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
-| **T6.5** | `GetByUserIdAsync` devuelve solo las solicitudes del usuario en orden de `CreatedAt` descendente y `Id` ascendente | BR-14, BR-42 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
-| **T6.6** | El seed carga al menos un evento con asientos y es reproducible | BR-04 | T6.1, F1 | **Implementada; pendiente de ejecutar con Docker** |
+| **T6.2** | `SaveAsync` con `Id` repetido falla | BR-08 | T6.1, F1 | **Implementada y verificada (2026-11-04)** |
+| **T6.3** | `UpdateStatusAsync` cambia el estado, lanza `KeyNotFoundException` si el Id no existe y los tres valores del enum se guardan y se leen | BR-10, BR-11 | T6.1, F1 | **Implementada y verificada (2026-11-04)** |
+| **T6.4** | `ExistsAsync` es `false` si el asiento no pertenece al evento | BR-01 | T6.1, F1 | **Implementada y verificada (2026-11-04)** |
+| **T6.5** | `GetByUserIdAsync` devuelve solo las solicitudes del usuario en orden de `CreatedAt` descendente y `Id` ascendente | BR-14, BR-42 | T6.1, F1 | **Implementada y verificada (2026-11-04)** |
+| **T6.6** | El seed carga al menos un evento con asientos y es reproducible | BR-04 | T6.1, F1 | **Implementada y verificada (2026-11-04)** |
 | **T6.7** | El publisher envía el JSON acordado con `MessageId` y `CorrelationId` iguales al `requestId` | BR-17, BR-19 | T6.1, F3 | **Implementada y verificada** |
 | **T6.8** | El cliente deserializa el array de GUIDs ocupados y devuelve vacío si Booking responde `200` con `[]` (con un `HttpMessageHandler` falso) | BR-25, BR-26 | T6.1, F4 | **Implementada y verificada; actualizada al contrato de GUIDs (2026-11-04)** |
 | **T6.9** | `GetStatusByRequestIdAsync` devuelve `null` con `404` y lanza excepción ante un error | BR-27, BR-28 | T6.1, F4 | **Implementada y verificada** |
@@ -297,16 +288,16 @@ Pruebas de `Availability.Infrastructure.Tests`:
 |---|---:|---:|---:|---:|
 | F0 | 6 | 5 | 1 | 0 |
 | F1 | 12 | 11 | 1 | 0 |
-| F2 | 5 | 4 | 1 | 0 |
+| F2 | 5 | 5 | 0 | 0 |
 | F3 | 10 | 9 | 0 | 1 |
-| F4 | 11 | 7 | 0 | 4 |
+| F4 | 11 | 7 | 3 | 1 |
 | F5 | 7 | 4 | 3 | 0 |
-| F6 | 10 | 5 | 5 | 0 |
+| F6 | 10 | 10 | 0 | 0 |
 | F7 | 6 | 0 | 1 | 5 |
-| **Total** | **67** | **45** | **12** | **10** |
+| **Total** | **67** | **51** | **9** | **7** |
 
 **Criterio del resumen:** "Parciales" incluye tareas con una parte externa o de integración todavía pendiente; "Pendientes o bloqueadas" incluye las dependientes de decisiones, responsables externos, servicios reales o cierre de fases. T0.6 y T1.1 quedan parciales hasta compartir la configuración y los GUID del seed, respectivamente. T3.7 se confirmó mergeada en `origin/develop`.
 
-**Desbloqueos recientes:** U-03 permitió completar T1.7, U-04 T1.9, U-07 T4.7 y U-17/U-18 T5.1–T5.4. U-16 quedó resuelta con el acuerdo de xUnit, PostgreSQL vía Testcontainers, handlers HTTP falsos y doble de Service Bus. T6.7–T6.10 están verificadas; T6.2–T6.6 están implementadas, pero requieren ejecutar Docker tests. T1.10 y T1.11 quedaron completadas: se generó y aplicó `InitialCreate` en PostgreSQL 17 y se verificaron dos eventos y ocho asientos. T2.3 y T2.5 también se verificaron con la API iniciada desde Compose. T2.4 está parcial: Compose espera el healthcheck de PostgreSQL, pero Npgsql todavía no tiene `EnableRetryOnFailure()`. T4.6–T4.9 y T4.11 están implementadas. Las configuraciones de servicios externos para T4.10 y la publicación real de T3.9 siguen pendientes.
+**Desbloqueos recientes:** U-03 permitió completar T1.7, U-04 T1.9, U-07 T4.7 y U-17/U-18 T5.1–T5.4. U-15 quedó resuelta: API, migraciones y servicio Compose están integrados. U-16 quedó resuelta con xUnit, PostgreSQL vía Testcontainers, handlers HTTP falsos y doble de Service Bus. Las 12 pruebas de Infrastructure pasan; T6.2–T6.10 están verificadas. T1.10 y T1.11 quedaron completadas: se generó y aplicó `InitialCreate` en PostgreSQL 17 y se verificaron dos eventos y ocho asientos. T2.3 y T2.5 también se verificaron con la API iniciada desde Compose; T2.4 quedó implementada con `EnableRetryOnFailure()` y `depends_on` saludable. T4.6–T4.9 y T4.11 están implementadas; T4.3–T4.5 tienen decisiones y valores acordados, pero faltan los mapeos de Booking/Keycloak al servicio API. T4.10 y la publicación real de T3.9 siguen pendientes. Serilog, middleware de correlación y servicio API en Compose ya existen; T5.5/T5.7 siguen parciales por alinear el formato y los campos de auditoría HTTP.
 
-**Por dónde continuar ya mismo:** configurar el acceso de la API a Booking/Keycloak y ejecutar T4.10; coordinar autorización para la prueba real de Service Bus T3.9. Para completar F6, ejecutar T6.2–T6.6 con Docker disponible. T2.4 puede cerrarse agregando reintentos de conexión Npgsql si el grupo confirma esa decisión. F7 sigue sujeto a U-19/U-20 y al cierre de fases.
+**Por dónde continuar ya mismo:** completar los mapeos de Booking/Keycloak y ejecutar T4.10 cuando los servicios estén disponibles; coordinar autorización para la prueba real de Service Bus T3.9. T5.5/T5.7 requieren terminar de alinear los logs HTTP con la convención acordada. F7 sigue sujeto a U-19/U-20 y al cierre de fases.

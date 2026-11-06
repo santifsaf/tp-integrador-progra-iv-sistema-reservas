@@ -52,7 +52,9 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<AvailabilityDbContext>(options =>
-            options.UseNpgsql(availabilityDbConnectionString));
+            options.UseNpgsql(
+                configuration.GetConnectionString("AvailabilityDb"),
+                npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
 
         services.AddScoped<IReservationRequestRepository, ReservationRequestRepository>();
         services.AddScoped<IEventRepository, EventRepository>();

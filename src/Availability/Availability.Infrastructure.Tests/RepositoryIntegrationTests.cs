@@ -83,16 +83,22 @@ public sealed class RepositoryIntegrationTests(PostgreSqlFixture postgres)
     public async Task GetByUserIdAsync_ReturnsOnlyThatUsersRequestsInStableOrder()
     {
         var userId = Guid.NewGuid();
-        var otherUserRequest = CreateRequest(Guid.NewGuid(), Guid.NewGuid(), new DateTime(2026, 1, 4));
+        var otherUserRequest = CreateRequest(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new DateTime(2026, 1, 4, 0, 0, 0, DateTimeKind.Utc));
         var tieBreakSecond = CreateRequest(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             userId,
-            new DateTime(2026, 1, 3));
-        var newest = CreateRequest(Guid.NewGuid(), userId, new DateTime(2026, 1, 5));
+            new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc));
+        var newest = CreateRequest(
+            Guid.NewGuid(),
+            userId,
+            new DateTime(2026, 1, 5, 0, 0, 0, DateTimeKind.Utc));
         var tieBreakFirst = CreateRequest(
             Guid.Parse("11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             userId,
-            new DateTime(2026, 1, 3));
+            new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc));
         await SaveAsync(otherUserRequest, tieBreakSecond, newest, tieBreakFirst);
 
         await using var db = postgres.CreateDbContext();
@@ -110,21 +116,21 @@ public sealed class RepositoryIntegrationTests(PostgreSqlFixture postgres)
     [Fact]
     public async Task Seed_RecreatesTheSameEventsAndSeats()
     {
-        await using (var db = postgres.CreateDbContext())
+        var firstDatabaseName = $"availability_seed_first_{Guid.NewGuid():N}";
+        await using (var firstDb = postgres.CreateDbContext(firstDatabaseName))
         {
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
+            await firstDb.Database.EnsureCreatedAsync();
         }
 
-        var firstSnapshot = await ReadSeedAsync();
+        var firstSnapshot = await ReadSeedAsync(firstDatabaseName);
 
-        await using (var db = postgres.CreateDbContext())
+        var secondDatabaseName = $"availability_seed_second_{Guid.NewGuid():N}";
+        await using (var secondDb = postgres.CreateDbContext(secondDatabaseName))
         {
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
+            await secondDb.Database.EnsureCreatedAsync();
         }
 
-        var secondSnapshot = await ReadSeedAsync();
+        var secondSnapshot = await ReadSeedAsync(secondDatabaseName);
         Assert.Equal(firstSnapshot.Events, secondSnapshot.Events);
         Assert.Equal(firstSnapshot.Seats, secondSnapshot.Seats);
         Assert.Contains(firstSnapshot.Events, item => item.Id == Guid.Parse("11111111-1111-1111-1111-111111111111"));
@@ -142,9 +148,9 @@ public sealed class RepositoryIntegrationTests(PostgreSqlFixture postgres)
         await db.SaveChangesAsync();
     }
 
-    private async Task<(SeedEvent[] Events, SeedSeat[] Seats)> ReadSeedAsync()
+    private async Task<(SeedEvent[] Events, SeedSeat[] Seats)> ReadSeedAsync(string? databaseName = null)
     {
-        await using var db = postgres.CreateDbContext();
+        await using var db = postgres.CreateDbContext(databaseName);
         var events = await db.Events.AsNoTracking()
             .OrderBy(item => item.Id)
             .Select(item => new SeedEvent(item.Id, item.Name, item.StartsAt, item.PriceCents, item.Currency))
