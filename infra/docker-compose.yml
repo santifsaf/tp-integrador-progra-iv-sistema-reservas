@@ -77,7 +77,6 @@ services:
       context: ..
       dockerfile: src/Booking/Booking.Api/Dockerfile
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Booking: Host=booking-db;Port=5432;Database=${BOOKING_DB_NAME:-booking};Username=${BOOKING_DB_USER:-booking};Password=${BOOKING_DB_PASSWORD:-booking}
       Database__MigrateOnStartup: "true"
       # El issuer de los tokens es localhost:8081 (KC_HOSTNAME), así que Authority queda igual;
