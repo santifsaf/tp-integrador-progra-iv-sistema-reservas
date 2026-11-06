@@ -166,6 +166,82 @@ dotnet test src/Availability/Availability.Infrastructure.Tests
 Los tests de repositorios levantan su propio PostgreSQL con Testcontainers: necesitan Docker, pero no
 `availability-db`.
 
+## Postgres de Payment
+
+La base de Payment es el servicio `payment-db`. Como el resto, es una base propia en su propio contenedor:
+ningún otro servicio la lee.
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --wait payment-db
+```
+
+- **Puerto:** se publica en `localhost:5434`. Se puede cambiar con `PAYMENT_DB_PORT` en `infra/.env`;
+  entre contenedores siempre es `payment-db:5432`.
+- **Credenciales:** usuario, contraseña y base valen `payment` (`PAYMENT_DB_USER`, `PAYMENT_DB_PASSWORD`,
+  `PAYMENT_DB_NAME`). Son valores de desarrollo local, no secretos.
+- **Datos:** viven en el volumen `payment-db-data` y sobreviven a `docker compose down`.
+  Para empezar de cero: `docker compose -f infra/docker-compose.yml down -v`.
+
+Connection string desde la máquina (para `dotnet ef` y para la API corriendo fuera de Docker):
+
+```
+Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment
+```
+
+Payment.Grpc la lee de la clave `ConnectionStrings:Payment`. Para guardarla en user-secrets:
+
+```bash
+dotnet user-secrets set "ConnectionStrings:Payment" "Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment" --project src/Payment/Payment.Grpc
+```
+
+Si el comando avisa que falta el `UserSecretsId`, correr antes
+`dotnet user-secrets init --project src/Payment/Payment.Grpc`.
+
+### Migraciones
+
+`dotnet ef` toma la cadena de la variable de entorno `PAYMENT_DB_CONNECTION_STRING` (si falta, falla con un mensaje claro):
+
+```powershell
+# PowerShell
+$env:PAYMENT_DB_CONNECTION_STRING = "Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment"
+```
+
+```bash
+# Bash
+export PAYMENT_DB_CONNECTION_STRING="Host=localhost;Port=5434;Database=payment;Username=payment;Password=payment"
+```
+
+```bash
+dotnet ef database update --project src/Payment/Payment.Data
+```
+
+La base debe ser nueva o tener ya el historial de migraciones. Más detalle en
+[`src/Payment/Payment.Data/README.md`](../src/Payment/Payment.Data/README.md).
+
+### Tests
+
+```bash
+dotnet test src/Payment/Payment.Tests
+```
+
+Las pruebas de integración del repositorio levantan su propio PostgreSQL temporal con Testcontainers:
+solo necesitan Docker en ejecución, no `payment-db`.
+
+### Secrets
+
+- `PAYMENT_CLIENT_SECRET` (en `infra/.env`, por defecto `payment-secret`) es el secret del client `payment` en Keycloak.
+- Payment valida los tokens que recibe: `aud=payment` y solo acepta llamadas del client `booking`.
+  Quien llama a Payment (Booking) usa su propio secret, `BOOKING_CLIENT_SECRET`.
+
+Al incorporar Payment al compose, configurar en su servicio (el host es el nombre del servicio, no `localhost`):
+
+```yaml
+environment:
+  ConnectionStrings__Payment: Host=payment-db;Port=5432;Database=payment;Username=payment;Password=payment
+depends_on:
+  payment-db:
+    condition: service_healthy
+```
 
 ## Login con GitHub
 
