@@ -11,9 +11,14 @@ public class GetReservationStatusResponse
     public string RequestId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Estado actual de la solicitud (ej: "Pending", "Confirmed", "Failed").
+    /// Estado actual de la solicitud: PENDING, FAILED, HELD, CONFIRMED, REJECTED o EXPIRED.
     /// </summary>
     public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Detalle del estado, por ejemplo el motivo de un rechazo. Puede ser null.
+    /// </summary>
+    public string? Description { get; set; }
 
     /// <summary>
     /// Fecha y hora de creación de la solicitud (UTC).

@@ -55,6 +55,6 @@ public class CreateReservationRequestUseCase : ICreateReservationRequestUseCase
         await _reservationRequestRepository.UpdateStatusAsync(request.Id, RequestStatus.Published, ct);
 
         return Result<RequestReceivedDto>.Success(
-            new RequestReceivedDto(request.Id, RequestStatus.Published.ToString()));
+            new RequestReceivedDto(request.Id, RequestStatusNames.Pending));
     }
 }

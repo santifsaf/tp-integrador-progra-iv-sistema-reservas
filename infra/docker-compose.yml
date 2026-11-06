@@ -71,6 +71,56 @@ services:
       timeout: 5s
       retries: 10
 
+  availability-api:
+    build:
+      context: ..
+      dockerfile: src/Availability/Availability.Api/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:8080
+      - Keycloak__ClientSecret=${AVAILABILITY_CLIENT_SECRET}
+      - ConnectionStrings__AvailabilityDb=Host=availability-db;Port=5432;Database=${AVAILABILITY_DB_NAME:-availability};Username=${AVAILABILITY_DB_USER:-availability};Password=${AVAILABILITY_DB_PASSWORD:-availability}
+      - ServiceBus__ConnectionString=${MSG_BROKER_CONNECTION_STRING}
+    ports:
+      - "5100:8080"
+    depends_on:
+      availability-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - default
+    healthcheck:
+      # La imagen no trae curl y su /bin/sh (dash) no soporta /dev/tcp: se consulta /health con bash.
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.1 200' <&3",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  payment-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${PAYMENT_DB_USER:-payment}
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD:-payment}
+      POSTGRES_DB: ${PAYMENT_DB_NAME:-payment}
+    ports:
+      # Puerto del host (configurable en infra/.env); dentro de la red de Docker siempre es 5432.
+      - "${PAYMENT_DB_PORT:-5434}:5432"
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PAYMENT_DB_USER:-payment} -d ${PAYMENT_DB_NAME:-payment}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   booking-db-data:
   availability-db-data:
+  payment-db-data:
