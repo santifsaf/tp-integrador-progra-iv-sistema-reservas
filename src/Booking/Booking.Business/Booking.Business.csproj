@@ -4,7 +4,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <!-- Logging, Options, DI y Hosting (BackgroundService) vienen del framework de
+       ASP.NET Core, que Booking ya usa por ser una REST API. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Booking.Data/Booking.Data.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Booking.Business.Tests" />
+  </ItemGroup>
+  <!-- DECISIÓN: el mensaje del broker no se copia en Booking. Se compila directamente
+       el archivo compartido de /contracts, el mismo que usa Availability para publicar,
+       así los dos servicios no pueden quedar con versiones distintas del contrato. -->
+  <ItemGroup>
+    <Compile Include="../../../contracts/events/ReservationRequestedMessage.cs" Link="Messages/ReservationRequestedMessage.cs" />
   </ItemGroup>
 </Project>
